@@ -19,6 +19,7 @@ import {
   toggleStepCompletion,
   unlockMilestone
 } from '../../services/milestoneApi';
+import { getMe } from '../../services/authApi';
 
 const ICONS = ['◈', '◇', '✦', '◆'];
 const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -44,6 +45,7 @@ export const FutureScreen: React.FC = () => {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAligned, setIsAligned] = useState<boolean>(true);
   const [selected, setSelected] = useState<Milestone | null>(null);
   const [sheet, setSheet] = useState<string | null>(null);
   const [newStep, setNewStep] = useState('');
@@ -54,6 +56,16 @@ export const FutureScreen: React.FC = () => {
   const [newMilestoneDesc, setNewMilestoneDesc] = useState('');
   const [newMilestonePin, setNewMilestonePin] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+
+  const checkAlignment = async () => {
+    try {
+      const meData = await getMe();
+      const aligned = !!(meData && (meData.is_aligned || meData.partner));
+      setIsAligned(aligned);
+    } catch (e) {
+      console.log('Failed to check alignment in FutureScreen', e);
+    }
+  };
 
   const fetchMilestones = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -73,18 +85,31 @@ export const FutureScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchMilestones(true);
+    await Promise.all([fetchMilestones(true), checkAlignment()]);
     setRefreshing(false);
   };
 
   useEffect(() => {
     fetchMilestones();
+    checkAlignment();
 
-    const sub = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', () => {
+    const sub1 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', () => {
       fetchMilestones(true);
+      checkAlignment();
     });
+    const sub2 = DeviceEventEmitter.addListener('ALIGNMENT_BONDED', () => {
+      fetchMilestones(true);
+      checkAlignment();
+    });
+    const sub3 = DeviceEventEmitter.addListener('ALIGNMENT_BROKEN', () => {
+      fetchMilestones(true);
+      checkAlignment();
+    });
+
     return () => {
-      sub.remove();
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
     };
   }, []);
 
@@ -183,6 +208,10 @@ export const FutureScreen: React.FC = () => {
   };
 
   const handleCreateMilestone = async () => {
+    if (!isAligned) {
+      Alert.alert('Partner Required', 'Please connect with your partner first to create milestones.');
+      return;
+    }
     if (!newMilestoneName.trim()) return;
     if (isPrivate && (!newMilestonePin.trim() || newMilestonePin.length !== 4)) {
       Alert.alert('Validation Error', 'A 4-digit PIN is required for private milestones.');
@@ -208,9 +237,9 @@ export const FutureScreen: React.FC = () => {
       setIsPrivate(false);
       setSheet(null);
       fetchMilestones();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to create milestone.');
+      Alert.alert('Error', e?.response?.data?.detail || 'Failed to create milestone.');
     }
   };
 
@@ -278,7 +307,13 @@ export const FutureScreen: React.FC = () => {
             </View>
           )}
 
-          <Pressable style={styles.addBtn} onPress={() => setSheet('new')}>
+          <Pressable style={styles.addBtn} onPress={() => {
+            if (!isAligned) {
+              Alert.alert('Partner Required', 'Please connect with your partner first to create milestones.');
+              return;
+            }
+            setSheet('new');
+          }}>
             <AppText variant="smallCaps" color={Colors.accent}>+ Create a milestone</AppText>
           </Pressable>
 

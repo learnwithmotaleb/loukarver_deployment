@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { preventScreenCaptureAsync, allowScreenCaptureAsync } from 'expo-screen-capture';
 import { uploadSecret, getReceivedSecrets, getSentSecrets, getSecretViewUrl, requestRewatchSecret, approveRewatchSecret, declineRewatchSecret, revokeSecret } from '../../services/secretApi';
 import { triggerNotification } from '../../services/notificationApi';
+import { getMe } from '../../services/authApi';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import ReAnimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,7 @@ const Confidential: React.FC = () => {
   const [secrets, setSecrets] = useState<any[]>([]);
   const [sentSecrets, setSentSecrets] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAligned, setIsAligned] = useState<boolean>(true);
   const [viewingSecret, setViewingSecret] = useState<any | null>(null);
   const [mediaDataUri, setMediaDataUri] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
@@ -170,6 +172,16 @@ const Confidential: React.FC = () => {
     }
   };
 
+  const checkAlignment = async () => {
+    try {
+      const meData = await getMe();
+      const aligned = !!(meData && (meData.is_aligned || meData.partner));
+      setIsAligned(aligned);
+    } catch (e) {
+      console.log("Failed to check alignment in Confidential", e);
+    }
+  };
+
   useEffect(() => {
     const fetchToken = async () => {
       const token = await AsyncStorage.getItem('access_token');
@@ -177,16 +189,39 @@ const Confidential: React.FC = () => {
     };
     fetchToken();
     loadSecrets();
+    checkAlignment();
     
     const sub1 = DeviceEventEmitter.addListener('REFRESH_SECRET_DATA', loadSecrets);
-    const sub2 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', loadSecrets);
+    const sub2 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', () => {
+      loadSecrets();
+      checkAlignment();
+    });
+    const sub3 = DeviceEventEmitter.addListener('ALIGNMENT_BONDED', () => {
+      loadSecrets();
+      checkAlignment();
+    });
+    const sub4 = DeviceEventEmitter.addListener('ALIGNMENT_BROKEN', () => {
+      loadSecrets();
+      checkAlignment();
+    });
+
     return () => {
       sub1.remove();
       sub2.remove();
+      sub3.remove();
+      sub4.remove();
     };
   }, []);
 
   const handleCompose = async () => {
+    if (!isAligned) {
+      CustomAlert.alert(
+        "Partner Required",
+        "Please connect with your partner first to send confidential photos."
+      );
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.8,
@@ -200,8 +235,9 @@ const Confidential: React.FC = () => {
         await uploadSecret(asset.uri);
         triggerNotification("Confidential Message", "Sent a confidential message").catch(() => {});
         CustomAlert.alert("Success", "Secret sent successfully!");
-      } catch (error) {
-        CustomAlert.alert("Upload Failed", "Could not send the secret.");
+      } catch (error: any) {
+        const errorMsg = error?.response?.data?.detail || "Could not send the secret.";
+        CustomAlert.alert("Upload Failed", errorMsg);
         console.error(error);
       } finally {
         setIsUploading(false);
@@ -464,11 +500,38 @@ const Confidential: React.FC = () => {
 
       <View style={styles.composeSection}>
         <AppText variant="smallCaps" style={styles.composeLabel}>COMPOSE</AppText>
-        <Pressable style={styles.composeButton} onPress={handleCompose} disabled={isUploading}>
-          <AppText variant="heading" size={17} style={{ color: '#fff' }}>
+
+        {!isAligned && (
+          <View style={styles.notAlignedCard}>
+            <View style={styles.notAlignedHeader}>
+              <AppText style={{ fontSize: 16, marginRight: 8 }}>🔒</AppText>
+              <AppText variant="heading" size={15} style={{ color: '#E06C6C' }}>
+                Partner Not Connected
+              </AppText>
+            </View>
+            <AppText variant="serifItalic" size={13} style={styles.notAlignedDesc}>
+              Confidential photos are strictly private between two partners. Please connect with your partner on the Today tab first.
+            </AppText>
+            <Pressable 
+              style={styles.connectButton}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <AppText variant="mono" style={styles.connectButtonText}>
+                CONNECT WITH PARTNER →
+              </AppText>
+            </Pressable>
+          </View>
+        )}
+
+        <Pressable 
+          style={[styles.composeButton, !isAligned && styles.composeButtonDisabled]} 
+          onPress={handleCompose} 
+          disabled={isUploading}
+        >
+          <AppText variant="heading" size={17} style={{ color: !isAligned ? '#7A6E65' : '#fff' }}>
             {isUploading ? "Sending..." : "Send something private"}
           </AppText>
-          <AppText style={{ color: '#E8B4A0', fontSize: 18 }}>→</AppText>
+          <AppText style={{ color: !isAligned ? '#7A6E65' : '#E8B4A0', fontSize: 18 }}>→</AppText>
         </Pressable>
       </View>
 
@@ -606,6 +669,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E2622',
     padding: 20,
     borderRadius: 14,
+  },
+  composeButtonDisabled: {
+    opacity: 0.6,
+    borderWidth: 1,
+    borderColor: '#3A2E28',
+  },
+  notAlignedCard: {
+    backgroundColor: '#261D1A',
+    borderColor: '#3D2A24',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  notAlignedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  notAlignedDesc: {
+    color: '#A89B91',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  connectButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#AD442E',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  connectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    letterSpacing: 1,
+    fontWeight: '600',
   },
 });
 

@@ -26,6 +26,8 @@ import ReportScreen from '../screens/ReportScreen';
 import ReportChatScreen from '../screens/ReportChatScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMe } from '../services/authApi';
+import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -94,9 +96,10 @@ const linking = {
 export default function RootNavigator() {
   useEffect(() => {
     try {
-      const { OneSignal } = require('react-native-onesignal');
+      const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient || Constants.appOwnership === 'expo';
       const appId = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
-      if (appId) {
+      if (appId && Platform.OS !== 'web' && !isExpoGo) {
+        const { OneSignal } = require('react-native-onesignal');
         OneSignal.initialize(appId);
         OneSignal.Notifications.requestPermission(true);
 

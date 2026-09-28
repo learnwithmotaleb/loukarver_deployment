@@ -224,6 +224,10 @@ export const DatesScreen: React.FC = () => {
 
   const generateDate = async () => {
     if (isGenerating) return;
+    if (!user?.is_aligned && !user?.partner) {
+      Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
+      return;
+    }
     setIsGenerating(true);
     try {
       const payload = {
@@ -241,15 +245,19 @@ export const DatesScreen: React.FC = () => {
         setGeneratorSheet(false);
         refreshAll();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.log(e);
-      Alert.alert("Error", "Could not propose date.");
+      Alert.alert("Error", e?.response?.data?.detail || "Could not propose date.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const manualPropose = async () => {
+    if (!user?.is_aligned && !user?.partner) {
+      Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
+      return;
+    }
     if (!manualTitle.trim() && !manualLocation.trim()) {
       Alert.alert("Required", "Please provide a title or location for the date.");
       return;
@@ -279,7 +287,7 @@ export const DatesScreen: React.FC = () => {
       }
     } catch (e: any) {
       console.log("Error proposing manual date:", e);
-      Alert.alert("Error", e.response?.data?.detail || "Could not propose date.");
+      Alert.alert("Error", e?.response?.data?.detail || "Could not propose date.");
     } finally {
       setIsManualSubmitting(false);
     }
@@ -532,6 +540,10 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
 
       {/* ==================== DATE GENERATOR COMPACT ==================== */}
       <Pressable style={styles.generatorCard} onPress={() => {
+        if (!user?.is_aligned && !user?.partner) {
+          Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
+          return;
+        }
         setCity("");
         setMood("Romantic");
         setVibe("Outdoorsy");
@@ -632,7 +644,13 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
 
   const listFooterNode = (
     <View style={styles.inner}>
-      <Pressable style={styles.addBtn} onPress={() => setSheet("manual")}>
+      <Pressable style={styles.addBtn} onPress={() => {
+        if (!user?.is_aligned && !user?.partner) {
+          Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
+          return;
+        }
+        setSheet("manual");
+      }}>
         <AppText variant="smallCaps" color={Colors.accent}>
           + Propose manually
         </AppText>

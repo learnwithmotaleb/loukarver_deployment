@@ -26,6 +26,7 @@ import {
 import { completeRitual } from '../../services/ritualApi';
 import { createCheckin } from '../../services/checkinApi';
 import { getUserProfile, getPartnerProfile } from '../../services/userApi';
+import { getMe } from '../../services/authApi';
 import { SharedCheckinSheet } from '../../components/shared/SharedCheckinSheet';
 
 const TYPES = ['all', 'partner', 'letter', 'voice', 'photo', 'prompt', 'appreciation', 'checkin'] as const;
@@ -64,6 +65,7 @@ export const ThreadScreen: React.FC = () => {
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string>('Partner');
+  const [isAligned, setIsAligned] = useState<boolean>(true);
 
   // Form State
   const [textVal, setTextVal] = useState('');
@@ -130,7 +132,18 @@ export const ThreadScreen: React.FC = () => {
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [partnerPhoto, setPartnerPhoto] = useState<string | null>(null);
 
+  const checkAlignment = async () => {
+    try {
+      const meData = await getMe();
+      const aligned = !!(meData && (meData.is_aligned || meData.partner));
+      setIsAligned(aligned);
+    } catch (e) {
+      console.log('Failed to check alignment in ThreadScreen', e);
+    }
+  };
+
   useEffect(() => {
+    checkAlignment();
     getUserProfile().then((res) => {
       const data = res?.data || res;
       const id = data?.id || data?._id || data?.user_id;
@@ -166,8 +179,25 @@ export const ThreadScreen: React.FC = () => {
       }
       fetchMessages();
     });
+
+    const sub2 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', () => {
+      fetchMessages();
+      checkAlignment();
+    });
+    const sub3 = DeviceEventEmitter.addListener('ALIGNMENT_BONDED', () => {
+      fetchMessages();
+      checkAlignment();
+    });
+    const sub4 = DeviceEventEmitter.addListener('ALIGNMENT_BROKEN', () => {
+      fetchMessages();
+      checkAlignment();
+    });
+
     return () => {
       sub1.remove();
+      sub2.remove();
+      sub3.remove();
+      sub4.remove();
     };
   }, [fetchMessages]);
 
@@ -305,6 +335,10 @@ export const ThreadScreen: React.FC = () => {
   };
 
   const sendVoiceMessage = async () => {
+    if (!isAligned) {
+      Alert.alert('Partner Required', 'Please connect with your partner first to send voice notes.');
+      return;
+    }
     if (!previewUri) return;
     setIsSendingVoice(true);
     const file = {
@@ -319,13 +353,17 @@ export const ThreadScreen: React.FC = () => {
       fetchMessages();
     } catch (e: any) {
       console.error('Failed to send voice', e);
-      Alert.alert('Upload Failed', e.message || String(e));
+      Alert.alert('Upload Failed', e?.response?.data?.detail || e.message || String(e));
     } finally {
       setIsSendingVoice(false);
     }
   };
 
   const handleSend = async () => {
+    if (!isAligned) {
+      Alert.alert('Partner Required', 'Please connect with your partner first to post in Thread.');
+      return;
+    }
     const trimmedText = textVal.trim();
 
     try {
@@ -413,9 +451,9 @@ export const ThreadScreen: React.FC = () => {
       setReplyPromptId(null);
       setReplyPromptQuestion(null);
       fetchMessages(); // refresh manually as fallback to ws
-    } catch (e) {
+    } catch (e: any) {
       console.log("Error sending:", e);
-      Alert.alert('Upload Failed', String(e));
+      Alert.alert('Upload Failed', e?.response?.data?.detail || String(e));
     } finally {
       if (composeType === 'photo') {
         setIsSendingPhoto(false);
@@ -448,6 +486,10 @@ export const ThreadScreen: React.FC = () => {
                   pressed && { opacity: 0.85, backgroundColor: Colors.cream }
                 ]}
                 onPress={() => {
+                  if (!isAligned) {
+                    Alert.alert('Partner Required', 'Please connect with your partner first to post in Thread.');
+                    return;
+                  }
                   setComposeType(c.k as any);
                   setSheet(true);
                   setTextVal('');

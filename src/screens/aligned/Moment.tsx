@@ -11,6 +11,7 @@ import Confidential from "./Confidential";
 import { pokePartner, getInteractions } from "../../services/interactionsApi";
 import { createWatchSession, getWatchSessions, acceptWatchSession, setReadyWatchSession, triggerPlayWatchSession, deleteWatchSession } from "../../services/watchApi";
 import { triggerNotification } from "../../services/notificationApi";
+import { getMe } from "../../services/authApi";
 
 const PLATFORMS = [
   { name: "NETFLIX", color: "#E50914" },
@@ -25,6 +26,7 @@ const Moment: React.FC = () => {
   const [thinkingSent, setThinkingSent] = useState(false);
   const [interactionStats, setInteractionStats] = useState<any | null>(null);
   const [activeSheet, setActiveSheet] = useState<"watchTogether" | null>(null);
+  const [isAligned, setIsAligned] = useState<boolean>(true);
 
   // Watch state
   const [watchPlatform, setWatchPlatform] = useState("APPLE TV");
@@ -81,10 +83,38 @@ const Moment: React.FC = () => {
     return new Date(d);
   };
 
+  const checkAlignment = async () => {
+    try {
+      const meData = await getMe();
+      const aligned = !!(meData && (meData.is_aligned || meData.partner));
+      setIsAligned(aligned);
+    } catch (e) {
+      console.log("Failed to check alignment in Moment", e);
+    }
+  };
+
   useEffect(() => {
     loadAll();
-    const sub = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', loadAll);
-    return () => sub.remove();
+    checkAlignment();
+
+    const sub1 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', () => {
+      loadAll();
+      checkAlignment();
+    });
+    const sub2 = DeviceEventEmitter.addListener('ALIGNMENT_BONDED', () => {
+      loadAll();
+      checkAlignment();
+    });
+    const sub3 = DeviceEventEmitter.addListener('ALIGNMENT_BROKEN', () => {
+      loadAll();
+      checkAlignment();
+    });
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -114,14 +144,28 @@ const Moment: React.FC = () => {
   }, [activeSession]);
 
   const handlePoke = async () => {
+    if (!isAligned) {
+      Alert.alert("Partner Required", "Please connect with your partner first to send a silent ping.");
+      return;
+    }
     if (thinkingSent) return;
     setThinkingSent(true);
     try {
       await pokePartner();
       loadAll();
-    } catch (e) {
+    } catch (e: any) {
       setThinkingSent(false);
+      const msg = e?.response?.data?.detail || "Could not send ping to partner.";
+      Alert.alert("Notice", msg);
     }
+  };
+
+  const handleOpenWatch = () => {
+    if (!isAligned) {
+      Alert.alert("Partner Required", "Please connect with your partner first to schedule watch sessions.");
+      return;
+    }
+    setActiveSheet("watchTogether");
   };
 
   const handleWatchDatePress = (day: DateData) => {
@@ -136,6 +180,10 @@ const Moment: React.FC = () => {
   };
 
   const handleScheduleWatch = async () => {
+    if (!isAligned) {
+      Alert.alert("Partner Required", "Please connect with your partner first to schedule watch sessions.");
+      return;
+    }
     try {
       await createWatchSession({
         platform: watchPlatform,
@@ -149,8 +197,9 @@ const Moment: React.FC = () => {
       triggerNotification("Watch Together", `Scheduled a Watch Session for ${watchWhat}`).catch(() => {});
       setActiveSheet(null);
       loadAll();
-    } catch (e) {
-      Alert.alert("Error", "Could not schedule watch session.");
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || "Could not schedule watch session.";
+      Alert.alert("Error", msg);
     }
   };
 
@@ -161,7 +210,11 @@ const Moment: React.FC = () => {
       </AppText>
 
       <View style={styles.cardsContainer}>
-        <Pressable style={styles.card} onPress={handlePoke} disabled={thinkingSent}>
+        <Pressable 
+          style={[styles.card, !isAligned && { opacity: 0.75 }]} 
+          onPress={handlePoke} 
+          disabled={thinkingSent}
+        >
           <View style={styles.dotContainer}>
             <AppText style={{ fontSize: 16 }}>◉</AppText>
           </View>
@@ -196,8 +249,12 @@ const Moment: React.FC = () => {
         </Pressable>
 
         <Pressable 
-          style={[styles.card, activeSession && { backgroundColor: '#E4F1E8', borderColor: '#4CAF50', borderWidth: 1 }]} 
-          onPress={() => setActiveSheet("watchTogether")}
+          style={[
+            styles.card, 
+            activeSession && { backgroundColor: '#E4F1E8', borderColor: '#4CAF50', borderWidth: 1 },
+            !isAligned && { opacity: 0.75 }
+          ]} 
+          onPress={handleOpenWatch}
         >
           <View style={styles.dotContainer}>
             <AppText style={{ fontSize: 16 }}>◐</AppText>
