@@ -66,7 +66,6 @@ export const addReview = async (dateId, data) => {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      'ngrok-skip-browser-warning': 'true',
     },
     body: formData,
   });
@@ -107,7 +106,6 @@ export const updateReview = async (dateId, data) => {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      'ngrok-skip-browser-warning': 'true',
     },
     body: formData,
   });

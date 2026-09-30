@@ -207,9 +207,7 @@ export const submitVibeAnswers = async (partner_id, answers, timezone = "UTC") =
 export const getVibeResults = async (partner_id, timezone = "UTC") => {
   const params = new URLSearchParams({ timezone, t: Date.now().toString() });
   if (partner_id) params.append("partner_id", partner_id);
-  const response = await api.get(`/vibecheck/cards/results?${params.toString()}`, {
-    headers: { 'ngrok-skip-browser-warning': 'true' }
-  });
+  const response = await api.get(`/vibecheck/cards/results?${params.toString()}`);
   return response.data;
 };
 
