@@ -4,7 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_BACKEND_URL || 'https://16-170-226-19.sslip.io',
+  baseURL: process.env.EXPO_PUBLIC_BACKEND_URL || 'https://13-61-230-140.sslip.io',
 });
 
 api.interceptors.request.use(
