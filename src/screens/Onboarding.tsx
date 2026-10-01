@@ -1,6 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from "react";
-import { View, ScrollView, StyleSheet, Pressable, DeviceEventEmitter, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Pressable, DeviceEventEmitter, useWindowDimensions, Platform, Keyboard, Alert, Image } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Colors } from "../constants/colors";
@@ -11,7 +12,6 @@ import { RootStackParamList } from "../types";
 import { Calendar, DateData } from "react-native-calendars";
 import { Ionicons } from "@expo/vector-icons";
 import { createRelationship, uploadProfilePhoto, alignWithPartner, sendAlignmentRequest } from "../services/userApi";
-import { Alert, Image, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import QRCode from 'react-native-qrcode-svg';
 import { BottomSheet } from '../components/ui/BottomSheet';
@@ -87,6 +87,60 @@ export const Onboarding: React.FC = () => {
     setData((d) => ({ ...d, startDate: day.dateString }));
   };
 
+
+
+  const handleNext = async () => {
+    if (steps[step].key === "photo") {
+      if (!data.name || !data.city) {
+        Alert.alert("Missing Fields", "Please fill out all the fields before continuing.");
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        const today = new Date();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const y = String(today.getFullYear());
+        const formattedDate = `${m}.${d}.${y}`;
+        const payload = {
+          name: data.name,
+          city_name: data.city,
+          relationship_start_date: formattedDate,
+          is_long_distance: data.longDistance,
+          gender: data.gender,
+        };
+        const res = await createRelationship(payload);
+        if (res.success && res.data && res.data.secret_key) {
+          setSecretKey(res.data.secret_key);
+        }
+        if (data.photoUri) {
+          try {
+            await uploadProfilePhoto(data.photoUri);
+          } catch (uploadError) {
+            console.log("Photo upload failed:", uploadError);
+            Alert.alert("Upload Warning", "Relationship created but photo upload failed.");
+          }
+        }
+        Keyboard.dismiss();
+        setStep((s) => s + 1);
+      } catch (e: any) {
+        console.error(e);
+        const errorMessage = e.response?.data?.detail || e.message || "An error occurred.";
+        Alert.alert("Error", errorMessage);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else if (step < steps.length - 1) {
+      if (step === 1) {
+        Keyboard.dismiss();
+      }
+      setStep((s) => s + 1);
+    } else {
+      DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
+      nav.navigate("AlignedApp");
+    }
+  };
+
   const steps = [
     {
       key: "name",
@@ -100,6 +154,12 @@ export const Onboarding: React.FC = () => {
           value={data.name}
           onChangeText={(v) => setData((d) => ({ ...d, name: v }))}
           placeholder="Lou"
+          returnKeyType="next"
+          onSubmitEditing={() => {
+            if (data.name.trim()) {
+              setStep(1);
+            }
+          }}
         />
       ),
     },
@@ -115,6 +175,13 @@ export const Onboarding: React.FC = () => {
           value={data.city}
           onChangeText={(v) => setData((d) => ({ ...d, city: v }))}
           placeholder="Los Angeles"
+          returnKeyType="next"
+          onSubmitEditing={() => {
+            if (data.city.trim()) {
+              Keyboard.dismiss();
+              setStep(2);
+            }
+          }}
         />
       ),
     },
@@ -246,130 +313,97 @@ export const Onboarding: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <View style={styles.topBar}>
-          <AppText variant="smallCaps" color={Colors.muted}>
-            ◇ BEGINNING
-          </AppText>
-          <AppText variant="mono" color={Colors.light} style={{ fontSize: 10 }}>
-            {String(step + 1).padStart(2, "0")} /{" "}
-            {String(steps.length).padStart(2, "0")}
-          </AppText>
-        </View>
+        <View style={styles.container}>
+          <KeyboardAwareScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            bottomOffset={100}
+          >
+            {/* Header */}
+            <View style={styles.topBar}>
+              <AppText variant="smallCaps" color={Colors.muted}>
+                ◇ BEGINNING
+              </AppText>
+              <AppText variant="mono" color={Colors.light} style={{ fontSize: 10 }}>
+                {String(step + 1).padStart(2, "0")} /{" "}
+                {String(steps.length).padStart(2, "0")}
+              </AppText>
+            </View>
 
-        {/* Step content */}
-        <View style={styles.content}>
-          <AppText
-            variant="smallCaps"
-            color={Colors.accent}
-            style={{ marginBottom: 14 }}
-          >
-            {cur.kicker}
-          </AppText>
-          <AppText
-            variant="display"
-            size={42}
-            style={{ lineHeight: 42, marginBottom: 14 }}
-          >
-            {cur.title}
-          </AppText>
-          <AppText
-            variant="serifItalic"
-            size={18}
-            color={Colors.muted}
-            style={{ marginBottom: 36, lineHeight: 27 }}
-          >
-            {cur.sub}
-          </AppText>
-          {cur.body}
-        </View>
+            {/* Step content */}
+            <View style={styles.content}>
+              <AppText
+                variant="smallCaps"
+                color={Colors.accent}
+                style={{ marginBottom: 14 }}
+              >
+                {cur.kicker}
+              </AppText>
+              <AppText
+                variant="display"
+                size={42}
+                style={{ lineHeight: 42, marginBottom: 14 }}
+              >
+                {cur.title}
+              </AppText>
+              <AppText
+                variant="serifItalic"
+                size={18}
+                color={Colors.muted}
+                style={{ marginBottom: 36, lineHeight: 27 }}
+              >
+                {cur.sub}
+              </AppText>
+              {cur.body}
+            </View>
+          </KeyboardAwareScrollView>
 
-        {/* Progress bars */}
-        <View style={styles.progress}>
-          {steps.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.progressBar,
-                { backgroundColor: i <= step ? Colors.accent : Colors.rule },
-              ]}
-            />
-          ))}
-        </View>
+          {/* Sticky footer that moves with the keyboard */}
+          <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+            <View style={styles.footer}>
+              {/* Progress bars */}
+              <View style={styles.progress}>
+                {steps.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.progressBar,
+                      { backgroundColor: i <= step ? Colors.accent : Colors.rule },
+                    ]}
+                  />
+                ))}
+              </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          {step > 0 && (
-            <AppButton
-              variant="outline"
-              size="lg"
-              onPress={() => setStep((s) => s - 1)}
-              style={{ flex: 1 }}
-            >
-              Back
-            </AppButton>
-          )}
-          <AppButton
-            variant="solid"
-            size="lg"
-            style={{ flex: step > 0 ? 2 : 1 }}
-            disabled={isSubmitting}
-            onPress={async () => {
-              if (steps[step].key === "photo") {
-                if (!data.name || !data.city) {
-                  Alert.alert("Missing Fields", "Please fill out all the fields before continuing.");
-                  return;
-                }
-                setIsSubmitting(true);
-                try {
-                  const today = new Date();
-                  const m = String(today.getMonth() + 1).padStart(2, '0');
-                  const d = String(today.getDate()).padStart(2, '0');
-                  const y = String(today.getFullYear());
-                  const formattedDate = `${m}.${d}.${y}`;
-                  const payload = {
-                    name: data.name,
-                    city_name: data.city,
-                    relationship_start_date: formattedDate,
-                    is_long_distance: data.longDistance,
-                    gender: data.gender,
-                  };
-                  const res = await createRelationship(payload);
-                  if (res.success && res.data && res.data.secret_key) {
-                    setSecretKey(res.data.secret_key);
-                  }
-                  if (data.photoUri) {
-                    try {
-                      await uploadProfilePhoto(data.photoUri);
-                    } catch (uploadError) {
-                      console.log("Photo upload failed:", uploadError);
-                      Alert.alert("Upload Warning", "Relationship created but photo upload failed.");
-                    }
-                  }
-                  setStep((s) => s + 1);
-                } catch (e: any) {
-                  console.error(e);
-                  const errorMessage = e.response?.data?.detail || e.message || "An error occurred.";
-                  Alert.alert("Error", errorMessage);
-                } finally {
-                  setIsSubmitting(false);
-                }
-              } else if (step < steps.length - 1) {
-                setStep((s) => s + 1);
-              } else {
-                DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                nav.navigate("AlignedApp");
-              }
-            }}
-          >
-            {isSubmitting ? "Loading..." : step === steps.length - 1 ? "Enter →" : "Continue"}
-          </AppButton>
+              {/* Actions */}
+              <View style={styles.actions}>
+                {step > 0 && (
+                  <AppButton
+                    variant="outline"
+                    size="lg"
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setStep((s) => s - 1);
+                    }}
+                    style={{ flex: 1 }}
+                  >
+                    Back
+                  </AppButton>
+                )}
+                <AppButton
+                  variant="solid"
+                  size="lg"
+                  style={{ flex: step > 0 ? 2 : 1 }}
+                  disabled={isSubmitting}
+                  onPress={handleNext}
+                >
+                  {isSubmitting ? "Loading..." : step === steps.length - 1 ? "Enter →" : "Continue"}
+                </AppButton>
+              </View>
+            </View>
+          </KeyboardStickyView>
         </View>
-      </ScrollView>
 
       <BottomSheet
         open={qrSheet}
@@ -390,22 +424,28 @@ export const Onboarding: React.FC = () => {
           </AppText>
         </View>
       </BottomSheet>
-
-
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bone },
-  container: { flexGrow: 1, padding: 32 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 32,
+    paddingTop: 32,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
-    marginBottom: 48,
+    marginBottom: 40,
   },
   content: { flex: 1 },
+  footer: { paddingTop: 16, paddingBottom: 20 },
   datePickerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -433,7 +473,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.accent,
     padding: 20,
-
     alignItems: "center",
     marginTop: 4,
   },

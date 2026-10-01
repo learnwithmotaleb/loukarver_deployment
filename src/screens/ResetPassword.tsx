@@ -1,6 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useNavigation, useRoute, RouteProp, NavigationProp } from '@react-navigation/native';
 import { Colors } from '../constants/colors';
 import { AppText } from '../components/ui/AppText';
@@ -17,27 +18,12 @@ const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute<ResetPasswordRouteProp>();
   const email = route.params.email;
 
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const handleReset = async () => {
     setErrorText('');
@@ -61,18 +47,15 @@ const ResetPassword = () => {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
+        <KeyboardAwareScrollView
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: keyboardHeight > 0 ? (Platform.OS === 'ios' ? 40 : keyboardHeight + 20) : 40 }
+            { paddingBottom: 40 }
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
+          bottomOffset={20}
         >
           <Pressable onPress={() => navigation.goBack()} style={{ alignSelf: 'flex-start', paddingBottom: 16 }}>
             <AppText color={Colors.muted} variant="smallCaps">
@@ -133,8 +116,7 @@ const ResetPassword = () => {
               </AppText>
             </Pressable>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 };

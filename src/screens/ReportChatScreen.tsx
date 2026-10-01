@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator, Image } from 'react-native';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../types';
@@ -96,10 +97,7 @@ export default function ReportChatScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={{ flex: 1 }}>
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator size="small" color={Colors.accent} />
@@ -110,35 +108,38 @@ export default function ReportChatScreen() {
             style={styles.chatList}
             contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
             onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            keyboardShouldPersistTaps="handled"
           >
             {messages.map(renderMessage)}
           </ScrollView>
         )}
 
-        <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <View style={styles.inputContainer}>
-            <AppTextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Type a message..."
-              style={styles.textInput}
-              n=""
-              label=""
-            />
-            <Pressable 
-              style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]} 
-              onPress={handleSend}
-              disabled={sending || !inputText.trim()}
-            >
-              {sending ? (
-                 <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="send" size={16} color="#fff" />
-              )}
-            </Pressable>
+        <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+          <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={styles.inputContainer}>
+              <AppTextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type a message..."
+                style={styles.textInput}
+                n=""
+                label=""
+              />
+              <Pressable 
+                style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]} 
+                onPress={handleSend}
+                disabled={sending || !inputText.trim()}
+              >
+                {sending ? (
+                   <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={16} color="#fff" />
+                )}
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardStickyView>
+      </View>
     </SafeAreaView>
   );
 }

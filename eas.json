@@ -12,7 +12,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://13-61-230-140.sslip.io",
-        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "2fb64fca-532b-4307-ada8-f28aee0684e3"
+        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "9451cca9-5c30-4d6b-ad37-695bd389ca9f"
       },
       "android": {
         "buildType": "apk"
@@ -22,7 +22,7 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://13-61-230-140.sslip.io",
-        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "2fb64fca-532b-4307-ada8-f28aee0684e3"
+        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "9451cca9-5c30-4d6b-ad37-695bd389ca9f"
       },
       "android": {
         "buildType": "app-bundle"

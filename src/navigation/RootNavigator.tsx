@@ -75,7 +75,7 @@ import { useEffect } from 'react';
 export const navigationRef = createNavigationContainerRef<any>();
 
 const linking = {
-  prefixes: ['loukarver://'],
+  prefixes: ['samesy://', 'loukarver://'],
   config: {
     screens: {
       AlignedApp: {

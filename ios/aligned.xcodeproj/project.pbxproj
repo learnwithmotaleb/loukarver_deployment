@@ -515,7 +515,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.foisaldev.alignedrn;
+				PRODUCT_BUNDLE_IDENTIFIER = com.loukarver.app;
 				PRODUCT_NAME = aligned;
 				SWIFT_OBJC_BRIDGING_HEADER = "aligned/aligned-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -546,7 +546,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.foisaldev.alignedrn;
+				PRODUCT_BUNDLE_IDENTIFIER = com.loukarver.app;
 				PRODUCT_NAME = aligned;
 				SWIFT_OBJC_BRIDGING_HEADER = "aligned/aligned-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -688,7 +688,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.foisaldev.alignedrn.OneSignalNotificationServiceExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.loukarver.app.OneSignalNotificationServiceExtension;
 				PRODUCT_NAME = OneSignalNotificationServiceExtension;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -715,7 +715,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.foisaldev.alignedrn.OneSignalNotificationServiceExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.loukarver.app.OneSignalNotificationServiceExtension;
 				PRODUCT_NAME = OneSignalNotificationServiceExtension;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;

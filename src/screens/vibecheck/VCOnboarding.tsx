@@ -1,6 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Alert, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Pressable, Alert, useWindowDimensions, Keyboard } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors } from '../../constants/colors';
@@ -42,6 +43,7 @@ export const VCOnboarding: React.FC = () => {
   const [inviteData, setInviteData] = useState<{ invite_code: string; invite_link: string } | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
 
   const qrRef = React.useRef<any>(null);
 
@@ -182,6 +184,12 @@ export const VCOnboarding: React.FC = () => {
               setErrorMsg(null);
             }}
             placeholder="You"
+            returnKeyType="next"
+            onSubmitEditing={() => {
+              if (name.trim()) {
+                handleSetupProfileAndNext();
+              }
+            }}
           />
         </View>
       ),
@@ -257,6 +265,10 @@ export const VCOnboarding: React.FC = () => {
                 }}
                 placeholder="e.g. VIBE-k7d2x"
                 autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                }}
               />
             </View>
           )}
@@ -334,67 +346,82 @@ export const VCOnboarding: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.topBar}>
-          <AppText variant="smallCaps" color={Colors.muted}>vibe check</AppText>
-          <AppText variant="mono" color={Colors.light} style={{ fontSize: 10 }}>
-            {String(step + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
-          </AppText>
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <AppText variant="smallCaps" color={Colors.accent} style={{ marginBottom: 14 }}>{cur.kicker}</AppText>
-          <AppText variant="display" size={38} style={{ lineHeight: 38, marginBottom: 14 }}>{cur.title}</AppText>
-          {cur.sub && <AppText variant="serifItalic" size={17} color={Colors.muted} style={{ marginBottom: 30, lineHeight: 25 }}>{cur.sub}</AppText>}
-          
-          {errorMsg && (
-            <View style={styles.errorBox}>
-              <AppText variant="mono" style={{ color: '#D32F2F', fontSize: 11 }}>{errorMsg}</AppText>
-            </View>
-          )}
-
-          {cur.body}
-        </View>
-
-        <View style={styles.progress}>
-          {steps.map((_, i) => (
-            <View key={i} style={[styles.bar, { backgroundColor: i <= step ? Colors.accent : Colors.rule }]} />
-          ))}
-        </View>
-
-        <View style={styles.actions}>
-          {step > 0 && (
-            <AppButton variant="outline" size="lg" onPress={() => { setStep(s => s - 1); setErrorMsg(null); }} style={{ flex: 1 }}>
-              Back
-            </AppButton>
-          )}
-          <AppButton
-            variant="solid"
-            size="lg"
-            style={{ flex: step > 0 ? 2 : 1 }}
-            disabled={loading}
-            onPress={() => {
-              if (step < steps.length - 1) {
-                if (step === 0) {
-                  if (!name.trim()) {
-                    setErrorMsg('Please enter your name.');
-                    return;
-                  }
-                  handleSetupProfileAndNext();
-                } else {
-                  setStep(s => s + 1);
-                }
-              } else {
-                handleFinish();
-              }
-            }}
+        <View style={styles.container}>
+          <KeyboardAwareScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            bottomOffset={100}
           >
-            {step === steps.length - 1
-              ? loading ? 'Connecting...' : 'Start →'
-              : loading ? 'Setting up...' : 'Continue'}
-          </AppButton>
+            <View style={styles.topBar}>
+              <AppText variant="smallCaps" color={Colors.muted}>vibe check</AppText>
+              <AppText variant="mono" color={Colors.light} style={{ fontSize: 10 }}>
+                {String(step + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
+              </AppText>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <AppText variant="smallCaps" color={Colors.accent} style={{ marginBottom: 14 }}>{cur.kicker}</AppText>
+              <AppText variant="display" size={38} style={{ lineHeight: 38, marginBottom: 14 }}>{cur.title}</AppText>
+              {cur.sub && <AppText variant="serifItalic" size={17} color={Colors.muted} style={{ marginBottom: 30, lineHeight: 25 }}>{cur.sub}</AppText>}
+              
+              {errorMsg && (
+                <View style={styles.errorBox}>
+                  <AppText variant="mono" style={{ color: '#D32F2F', fontSize: 11 }}>{errorMsg}</AppText>
+                </View>
+              )}
+
+              {cur.body}
+            </View>
+          </KeyboardAwareScrollView>
+
+          {/* Sticky footer that moves with the keyboard */}
+          <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+            <View style={styles.footer}>
+              <View style={styles.progress}>
+                {steps.map((_, i) => (
+                  <View key={i} style={[styles.bar, { backgroundColor: i <= step ? Colors.accent : Colors.rule }]} />
+                ))}
+              </View>
+
+              <View style={styles.actions}>
+                {step > 0 && (
+                  <AppButton variant="outline" size="lg" onPress={() => { Keyboard.dismiss(); setStep(s => s - 1); setErrorMsg(null); }} style={{ flex: 1 }}>
+                    Back
+                  </AppButton>
+                )}
+                <AppButton
+                  variant="solid"
+                  size="lg"
+                  style={{ flex: step > 0 ? 2 : 1 }}
+                  disabled={loading}
+                  onPress={() => {
+                    if (step < steps.length - 1) {
+                      if (step === 0) {
+                        if (!name.trim()) {
+                          setErrorMsg('Please enter your name.');
+                          return;
+                        }
+                        Keyboard.dismiss();
+                        handleSetupProfileAndNext();
+                      } else {
+                        Keyboard.dismiss();
+                        setStep(s => s + 1);
+                      }
+                    } else {
+                      handleFinish();
+                    }
+                  }}
+                >
+                  {step === steps.length - 1
+                    ? loading ? 'Connecting...' : 'Start →'
+                    : loading ? 'Setting up...' : 'Continue'}
+                </AppButton>
+              </View>
+            </View>
+          </KeyboardStickyView>
         </View>
-      </ScrollView>
 
       {/* ==================== QR CODE SHEET ==================== */}
       <BottomSheet
@@ -489,8 +516,14 @@ export const VCOnboarding: React.FC = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bone },
-  container: { flexGrow: 1, padding: 32 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 48 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 32,
+    paddingTop: 32,
+  },
+  scrollContent: { flexGrow: 1 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
+  footer: { paddingTop: 16, paddingBottom: 20 },
   optRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: Colors.rule, gap: 12,

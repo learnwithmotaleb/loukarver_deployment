@@ -1,4 +1,4 @@
-package com.foisaldev.alignedrn
+package com.loukarver.app
 
 import android.app.Application
 import android.content.res.Configuration

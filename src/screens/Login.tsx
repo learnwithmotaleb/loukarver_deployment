@@ -1,6 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useNavigation, NavigationProp, useRoute, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/colors';
@@ -19,7 +20,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
 
   useEffect(() => {
     if (route.params?.email || route.params?.initialEmail) {
@@ -27,22 +28,7 @@ const Login = () => {
     }
   }, [route.params?.email, route.params?.initialEmail]);
 
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   useEffect(() => {
     const checkAutoLogin = async () => {
@@ -103,18 +89,15 @@ const Login = () => {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
+        <KeyboardAwareScrollView
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: keyboardHeight > 0 ? (Platform.OS === 'ios' ? 40 : keyboardHeight + 20) : 40 }
+            { paddingBottom: 40 }
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
+          bottomOffset={20}
         >
           <View style={styles.content}>
             <AppText variant="smallCaps" color={Colors.accent} style={{ marginBottom: 14 }}>
@@ -178,8 +161,7 @@ const Login = () => {
               </AppText>
             </Pressable>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 };

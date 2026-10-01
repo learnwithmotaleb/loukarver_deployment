@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>aligned</string>
+    <string>Samesy</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -27,7 +27,8 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.foisaldev.alignedrn</string>
+          <string>samesy</string>
+          <string>com.loukarver.app</string>
         </array>
       </dict>
       <dict>
@@ -53,7 +54,7 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow Aligned to access your camera to scan alignment QR codes.</string>
+    <string>Allow Samesy to access your camera to scan pairing QR codes.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationAlwaysUsageDescription</key>
@@ -61,11 +62,11 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow Aligned to access your microphone for voice notes.</string>
+    <string>Allow Samesy to access your microphone for voice notes.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Allow Aligned to save photos to your device.</string>
+    <string>Allow Samesy to save photos to your device.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow Aligned to save photos to your device.</string>
+    <string>Allow Samesy to access your photo library for profile photos and shared memories.</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UIBackgroundModes</key>

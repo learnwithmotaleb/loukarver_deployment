@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
@@ -17,6 +18,7 @@ export default function ReportScreen() {
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -141,53 +143,59 @@ export default function ReportScreen() {
           <AppText variant="heading">New Report</AppText>
           <View style={{ width: 24 }} />
         </View>
-        <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
-          <AppText style={{ color: Colors.ink2, marginBottom: 20 }}>
-            Describe the issue you're facing or any feedback you have. Our support team will get back to you.
-          </AppText>
-          
-          <AppTextInput
-            label="Title"
-            placeholder="E.g. Cannot upload profile photo"
-            value={title}
-            onChangeText={setTitle}
-          />
-          <View style={{ height: 16 }} />
-          
-          <AppTextInput
-            label="Description"
-            placeholder="Please provide details..."
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={5}
-            style={{ minHeight: 100, textAlignVertical: 'top' }}
-          />
-          <View style={{ height: 16 }} />
-          
-          <Pressable style={styles.uploadBtn} onPress={handlePickFile}>
-            <Ionicons name="image-outline" size={20} color={Colors.accent} />
-            <AppText style={{ marginLeft: 8, color: Colors.accent }}>
-              {attachedFile ? 'Change Attached Image' : 'Attach Image (Optional)'}
-            </AppText>
-          </Pressable>
-          
-          {attachedFile && (
-            <AppText style={{ fontSize: 12, color: Colors.muted, marginTop: 8 }}>
-              Selected: {attachedFile.uri.split('/').pop()}
-            </AppText>
-          )}
-          
-          <View style={{ height: 40 }} />
-          <AppButton 
-            variant="solid" 
-            onPress={handleSubmit} 
-            disabled={submitting || !title || !description}
-            full
+        <KeyboardAwareScrollView
+            style={styles.content}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bottomOffset={20}
           >
-            {submitting ? 'Submitting...' : 'Submit Report'}
-          </AppButton>
-        </ScrollView>
+            <AppText style={{ color: Colors.ink2, marginBottom: 20 }}>
+              Describe the issue you're facing or any feedback you have. Our support team will get back to you.
+            </AppText>
+            
+            <AppTextInput
+              label="Title"
+              placeholder="E.g. Cannot upload profile photo"
+              value={title}
+              onChangeText={setTitle}
+            />
+            <View style={{ height: 16 }} />
+            
+            <AppTextInput
+              label="Description"
+              placeholder="Please provide details..."
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={5}
+              style={{ minHeight: 100, textAlignVertical: 'top' }}
+            />
+            <View style={{ height: 16 }} />
+            
+            <Pressable style={styles.uploadBtn} onPress={handlePickFile}>
+              <Ionicons name="image-outline" size={20} color={Colors.accent} />
+              <AppText style={{ marginLeft: 8, color: Colors.accent }}>
+                {attachedFile ? 'Change Attached Image' : 'Attach Image (Optional)'}
+              </AppText>
+            </Pressable>
+            
+            {attachedFile && (
+              <AppText style={{ fontSize: 12, color: Colors.muted, marginTop: 8 }}>
+                Selected: {attachedFile.uri.split('/').pop()}
+              </AppText>
+            )}
+            
+            <View style={{ height: 40 }} />
+            <AppButton 
+              variant="solid" 
+              onPress={handleSubmit} 
+              disabled={submitting || !title || !description}
+              full
+            >
+              {submitting ? 'Submitting...' : 'Submit Report'}
+            </AppButton>
+          </KeyboardAwareScrollView>
       </SafeAreaView>
     );
   }
@@ -209,7 +217,7 @@ export default function ReportScreen() {
           <ActivityIndicator size="small" color={Colors.accent} />
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <KeyboardAwareScrollView style={styles.content}>
           {reports.length === 0 ? (
             <View style={styles.empty}>
               <AppText style={{ color: Colors.muted, textAlign: 'center' }}>You have no support tickets.</AppText>
@@ -241,7 +249,7 @@ export default function ReportScreen() {
               ))}
             </View>
           )}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
     </SafeAreaView>
   );

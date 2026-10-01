@@ -2,10 +2,16 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useFonts } from 'expo-font';
-import { ActivityIndicator, View, Linking, Platform, Alert } from 'react-native';
+import { ActivityIndicator, View, Linking, Platform, Alert, LogBox } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 enableScreens(true);
+
+// Ignore benign Expo Go media library warning on Android
+LogBox.ignoreLogs([
+  'Due to changes in Androids permission requirements',
+]);
 
 import RootNavigator from './src/navigation/RootNavigator';
 import { Colors } from './src/constants/colors';
@@ -65,11 +71,13 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <StatusBar style="dark" backgroundColor={Colors.bone} />
-        <RootNavigator />
-        <CustomAlert />
-      </SafeAreaProvider>
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <StatusBar style="dark" backgroundColor={Colors.bone} />
+          <RootNavigator />
+          <CustomAlert />
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }
