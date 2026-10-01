@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "aligned",
-    "slug": "aligned-rn",
+    "name": "Lou Karver",
+    "slug": "lou-karver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,14 +11,15 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.foisaldev.alignedrn",
+      "bundleIdentifier": "com.loukarver.app",
+      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow Aligned to access your camera to scan alignment QR codes.",
-        "NSPhotoLibraryUsageDescription": "Allow Aligned to access your photo library for profile photos and shared memories.",
-        "NSMicrophoneUsageDescription": "Allow Aligned to access your microphone for voice notes.",
+        "NSCameraUsageDescription": "Allow Lou Karver to access your camera to scan alignment QR codes.",
+        "NSPhotoLibraryUsageDescription": "Allow Lou Karver to access your photo library for profile photos and shared memories.",
+        "NSMicrophoneUsageDescription": "Allow Lou Karver to access your microphone for voice notes.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -26,7 +27,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#F4EEE4"
       },
-      "package": "com.foisaldev.alignedrn",
+      "package": "com.loukarver.app",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
@@ -46,8 +47,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Aligned to save photos to your device.",
-          "savePhotosPermission": "Allow Aligned to save photos to your device.",
+          "photosPermission": "Allow Lou Karver to save photos to your device.",
+          "savePhotosPermission": "Allow Lou Karver to save photos to your device.",
           "isAccessMediaLocationEnabled": false
         }
       ],
@@ -60,7 +61,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow Aligned to access your microphone for voice notes."
+          "microphonePermission": "Allow Lou Karver to access your microphone for voice notes."
         }
       ],
       "expo-video"
