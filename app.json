@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Samesy",
-    "slug": "aligned-rn",
+    "slug": "samesy",
     "scheme": "samesy",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,6 +13,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.loukarver.app",
+      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },

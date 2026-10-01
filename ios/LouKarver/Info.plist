@@ -34,7 +34,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>exp+aligned-rn</string>
+          <string>exp+lou-karver</string>
         </array>
       </dict>
     </array>
