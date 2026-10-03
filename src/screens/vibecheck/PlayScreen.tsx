@@ -245,8 +245,9 @@ export const PlayScreen: React.FC = () => {
       // Immediate first check
       checkPartnerAnswer();
       
-      // ALWAYS start polling (as a reliable fallback for ngrok/websocket issues)
-      interval = setInterval(checkPartnerAnswer, 2000);
+      // Fix #6: Don't always poll — try WebSocket first, fall back to polling only on failure
+      // Polling interval increased from 2s to 8s to reduce network pressure
+      const POLL_INTERVAL = 8000;
       
       // Connect to WebSocket
       const baseUrl = api.defaults.baseURL || "http://localhost:8006";
@@ -257,11 +258,17 @@ export const PlayScreen: React.FC = () => {
 
           ws.onopen = () => {
             console.log("WS Connected:", wsUrl);
+            // WebSocket connected — stop polling if it was started
+            if (interval) {
+              clearInterval(interval);
+              interval = null;
+            }
           };
 
           ws.onmessage = (event) => {
             console.log("WS Message received:", event.data);
             try {
+              if (typeof event.data !== 'string' || !event.data.trim()) return;
               const data = JSON.parse(event.data);
               if (data.type === "PARTNER_ANSWERED" && data.partner_id === currentPartnerId) {
                 // Partner answered! Re-fetch the result
@@ -274,7 +281,7 @@ export const PlayScreen: React.FC = () => {
             console.log("WebSocket error:", e.message || "Unknown error");
             if (!interval && !cancelled) {
                 console.log("Falling back to polling...");
-                interval = setInterval(checkPartnerAnswer, 2000);
+                interval = setInterval(checkPartnerAnswer, POLL_INTERVAL);
             }
           };
 
@@ -282,13 +289,13 @@ export const PlayScreen: React.FC = () => {
             console.log("WS Closed");
             if (!interval && !cancelled) {
                 console.log("Falling back to polling...");
-                interval = setInterval(checkPartnerAnswer, 2000);
+                interval = setInterval(checkPartnerAnswer, POLL_INTERVAL);
             }
           };
       } catch (e) {
           console.error("Failed to setup WS:", e);
           if (!interval && !cancelled) {
-              interval = setInterval(checkPartnerAnswer, 2000);
+              interval = setInterval(checkPartnerAnswer, POLL_INTERVAL);
           }
       }
     }

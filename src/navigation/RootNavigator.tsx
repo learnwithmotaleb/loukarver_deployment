@@ -94,14 +94,21 @@ const linking = {
 };
 
 export default function RootNavigator() {
+  // Fix #7: Override Alert.alert AFTER React tree mounts (CustomAlert listener is ready)
+  useEffect(() => {
+    const { Alert } = require('react-native');
+    const { CustomAlert: CA } = require('../components/ui/CustomAlert');
+    Alert.alert = CA.alert;
+  }, []);
+
   useEffect(() => {
     try {
       const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient || Constants.appOwnership === 'expo';
       const appId = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
       if (appId && Platform.OS !== 'web' && !isExpoGo) {
         const { OneSignal } = require('react-native-onesignal');
-        OneSignal.initialize(appId);
-        OneSignal.Notifications.requestPermission(true);
+        // Fix #3: Removed duplicate OneSignal.initialize() and requestPermission()
+        // — initialization is done ONCE in App.tsx at module level.
 
         const handleNotificationClick = (event: any) => {
           const data = event?.notification?.additionalData;

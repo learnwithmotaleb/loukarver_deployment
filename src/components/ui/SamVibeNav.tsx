@@ -228,6 +228,8 @@ const SamVibeNav: React.FC<SamVibeNavProps> = ({ onPartnerChange }) => {
     let ws: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout>;
     let isMounted = true;
+    let reconnectDelay = 3000; // Fix #5: exponential backoff
+    const MAX_DELAY = 30000;
     
     const connectWs = () => {
       if (!isMounted) return;
@@ -237,9 +239,14 @@ const SamVibeNav: React.FC<SamVibeNavProps> = ({ onPartnerChange }) => {
         : `ws://localhost:8000/ws/notifications/${profile.user_id}`;
         
       ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        reconnectDelay = 3000; // Reset backoff on successful connection
+      };
       
       ws.onmessage = (event) => {
         try {
+          if (typeof event.data !== 'string' || !event.data.trim()) return;
           const data = JSON.parse(event.data);
           if (data.type === "NEW_NOTIFICATION" || data.type === "FLAG_CREATED" || data.type === "PULSE_UPDATED") {
              DeviceEventEmitter.emit("REFRESH_VIBE_DATA");
@@ -252,7 +259,8 @@ const SamVibeNav: React.FC<SamVibeNavProps> = ({ onPartnerChange }) => {
 
       ws.onclose = () => {
          if (isMounted) {
-            reconnectTimer = setTimeout(connectWs, 3000);
+            reconnectTimer = setTimeout(connectWs, reconnectDelay);
+            reconnectDelay = Math.min(reconnectDelay * 2, MAX_DELAY);
          }
       };
     };

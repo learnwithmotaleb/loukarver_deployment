@@ -31,6 +31,81 @@ const LABEL: Record<string, string> = {
   checkin: 'Check-in',
 };
 
+/**
+ * Isolated VoicePlayer component — native audio player is only created
+ * when this component mounts (i.e. only for voice entries).
+ */
+const VoicePlayer: React.FC<{ url: string }> = ({ url }) => {
+  const player = useAudioPlayer(url);
+  const status = useAudioPlayerStatus(player);
+  const isPlaying = player.playing;
+
+  const durationMs = status.duration || 0;
+  const positionMs = status.currentTime || 0;
+  const durSecs = Math.floor(durationMs / 1000);
+  const posSecs = Math.floor(positionMs / 1000);
+
+  const duration = `${Math.floor(durSecs/60).toString().padStart(2,'0')}:${(durSecs%60).toString().padStart(2,'0')}`;
+  const position = `${Math.floor(posSecs/60).toString().padStart(2,'0')}:${(posSecs%60).toString().padStart(2,'0')}`;
+  const progress = durationMs ? (positionMs / durationMs) : 0;
+
+  const togglePlayback = () => {
+    try {
+      if (isPlaying) {
+        player.pause();
+      } else {
+        if (progress >= 0.99) {
+          player.seekTo(0);
+        }
+        player.play();
+      }
+    } catch (err) {
+      console.error('Playback error:', err);
+    }
+  };
+
+  const handleSeek = (e: any) => {
+    try {
+      const { locationX } = e.nativeEvent;
+      const SCRUBBER_WIDTH = 220;
+      let percentage = locationX / SCRUBBER_WIDTH;
+      if (percentage < 0) percentage = 0;
+      if (percentage > 1) percentage = 1;
+
+      if (durationMs) {
+        player.seekTo(percentage * durationMs);
+      }
+    } catch (err) {
+      console.log('Error seeking', err);
+    }
+  };
+
+  return (
+    <View style={styles.voicePlayer}>
+      <Pressable style={styles.playButton} onPress={togglePlayback}>
+        <Ionicons name={isPlaying ? "pause" : "play"} size={15} color="#fff" style={{ marginLeft: isPlaying ? 0 : 2 }} />
+      </Pressable>
+
+      <View style={{ marginLeft: 12, flex: 1 }}>
+        <Pressable onPress={handleSeek}>
+          <View style={styles.scrubberBg}>
+            <View style={[styles.scrubberFill, { width: `${progress * 100}%` }]} />
+          </View>
+        </Pressable>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+          <AppText variant="mono" style={{ color: Colors.muted, fontSize: 10 }}>
+            {position}
+          </AppText>
+          <AppText variant="mono" style={{ color: Colors.muted, fontSize: 10 }}>
+            {duration}
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 export const ThreadEntryCard: React.FC<ThreadEntryProps> = ({ entry: t, onDelete, onReplyPrompt, currentUserId, userPhoto, partnerPhoto }) => {
   const typeStr = (t.type || t.category || '').toLowerCase();
   
@@ -48,23 +123,9 @@ export const ThreadEntryCard: React.FC<ThreadEntryProps> = ({ entry: t, onDelete
   const senderName = t.sender_name || (t.from && (Config.DEMO_USERS as any)[t.from]?.name) || 'Unknown';
   const textContent = t.text || t.content?.text || '';
 
-  // --- Audio Playback Logic ---
   const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8000';
   const fileUrl = t.content?.file_url;
   const fullUrl = fileUrl ? (fileUrl.startsWith('http') ? fileUrl : `${backendUrl}${fileUrl}`) : null;
-
-  const player = useAudioPlayer(fullUrl);
-  const status = useAudioPlayerStatus(player);
-  const isPlaying = player.playing;
-  
-  const durationMs = status.duration || 0;
-  const positionMs = status.currentTime || 0;
-  const durSecs = Math.floor(durationMs / 1000);
-  const posSecs = Math.floor(positionMs / 1000);
-  
-  const duration = `${Math.floor(durSecs/60).toString().padStart(2,'0')}:${(durSecs%60).toString().padStart(2,'0')}`;
-  const position = `${Math.floor(posSecs/60).toString().padStart(2,'0')}:${(posSecs%60).toString().padStart(2,'0')}`;
-  const progress = durationMs ? (positionMs / durationMs) : 0;
 
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
 
@@ -84,43 +145,6 @@ export const ThreadEntryCard: React.FC<ThreadEntryProps> = ({ entry: t, onDelete
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to save photo.');
-    }
-  };
-
-  useEffect(() => {
-    // Unloading handled automatically by expo-audio hook
-  }, []);
-
-  const togglePlayback = () => {
-    if (!fullUrl) return;
-
-    try {
-      if (isPlaying) {
-        player.pause();
-      } else {
-        if (progress >= 0.99) {
-          player.seekTo(0);
-        }
-        player.play();
-      }
-    } catch (err) {
-      console.error('Playback error:', err);
-    }
-  };
-
-  const handleSeek = (e: any) => {
-    try {
-      const { locationX } = e.nativeEvent;
-      const SCRUBBER_WIDTH = 220; 
-      let percentage = locationX / SCRUBBER_WIDTH;
-      if (percentage < 0) percentage = 0;
-      if (percentage > 1) percentage = 1;
-      
-      if (durationMs) {
-        player.seekTo(percentage * durationMs);
-      }
-    } catch (err) {
-      console.log('Error seeking', err);
     }
   };
 
@@ -220,30 +244,9 @@ export const ThreadEntryCard: React.FC<ThreadEntryProps> = ({ entry: t, onDelete
       )}
 
       {/* VOICE */}
-      {typeStr === 'voice' && (
+      {typeStr === 'voice' && fullUrl && (
         <View style={styles.contentBox}>
-          <View style={styles.voicePlayer}>
-            <Pressable style={styles.playButton} onPress={togglePlayback}>
-              <Ionicons name={isPlaying ? "pause" : "play"} size={15} color="#fff" style={{ marginLeft: isPlaying ? 0 : 2 }} />
-            </Pressable>
-            
-            <View style={{ marginLeft: 12, flex: 1 }}>
-              <Pressable onPress={handleSeek}>
-                <View style={styles.scrubberBg}>
-                  <View style={[styles.scrubberFill, { width: `${progress * 100}%` }]} />
-                </View>
-              </Pressable>
-              
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                <AppText variant="mono" style={{ color: Colors.muted, fontSize: 10 }}>
-                  {position}
-                </AppText>
-                <AppText variant="mono" style={{ color: Colors.muted, fontSize: 10 }}>
-                  {duration}
-                </AppText>
-              </View>
-            </View>
-          </View>
+          <VoicePlayer url={fullUrl} />
         </View>
       )}
 

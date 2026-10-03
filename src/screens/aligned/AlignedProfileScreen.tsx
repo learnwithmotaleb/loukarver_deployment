@@ -799,7 +799,11 @@ export const AlignedProfileScreen: React.FC = () => {
                           backgroundColor: Colors.bone,
                         }}
                       >
-                        <Image source={{ uri: url || undefined }} style={{ width: '100%', aspectRatio: 1 }} />
+                        {url ? (
+                          <Image source={{ uri: url }} style={{ width: '100%', aspectRatio: 1 }} />
+                        ) : (
+                          <View style={{ width: '100%', aspectRatio: 1, backgroundColor: Colors.bone }} />
+                        )}
                       </Pressable>
 
                       {isCurrent ? (

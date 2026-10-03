@@ -32,6 +32,8 @@ function useGlobalWebSocket() {
   useEffect(() => {
     let active = true;
     let reconnectTimer: any = null;
+    let reconnectDelay = 3000; // Fix #5: exponential backoff starting at 3s
+    const MAX_RECONNECT_DELAY = 30000;
 
     const connectWS = async () => {
       if (!active) return;
@@ -39,7 +41,7 @@ function useGlobalWebSocket() {
         const meData = await getMe();
         const userId = meData?.id || meData?._id || meData?.data?.id || meData?.data?._id;
         if (!userId) {
-          if (active) reconnectTimer = setTimeout(connectWS, 3000);
+          if (active) reconnectTimer = setTimeout(connectWS, reconnectDelay);
           return;
         }
 
@@ -48,7 +50,7 @@ function useGlobalWebSocket() {
           baseUrl = baseUrl.slice(0, -1);
         }
         if (!baseUrl) {
-          if (active) reconnectTimer = setTimeout(connectWS, 3000);
+          if (active) reconnectTimer = setTimeout(connectWS, reconnectDelay);
           return;
         }
 
@@ -65,10 +67,12 @@ function useGlobalWebSocket() {
 
         ws.onopen = () => {
           console.log("Global WebSocket: Connected successfully for user", userId);
+          reconnectDelay = 3000; // Reset backoff on successful connection
         };
 
         ws.onmessage = (event) => {
           try {
+            if (typeof event.data !== 'string' || !event.data.trim()) return;
             const data = JSON.parse(event.data);
             console.log("Global WebSocket Message:", data);
             if (data.type === "THREAD_UPDATED" || data.type === "new_thread_message") {
@@ -111,15 +115,18 @@ function useGlobalWebSocket() {
         };
 
         ws.onclose = () => {
-          console.log("Global WebSocket Disconnected. Reconnecting in 3s...");
+          console.log(`Global WebSocket Disconnected. Reconnecting in ${reconnectDelay / 1000}s...`);
           if (active) {
-            reconnectTimer = setTimeout(connectWS, 3000);
+            reconnectTimer = setTimeout(connectWS, reconnectDelay);
+            // Exponential backoff: 3s → 6s → 12s → 24s → 30s (max)
+            reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
           }
         };
       } catch (e) {
         console.log("Error in Global WebSocket setup:", e);
         if (active) {
-          reconnectTimer = setTimeout(connectWS, 3000);
+          reconnectTimer = setTimeout(connectWS, reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
         }
       }
     };

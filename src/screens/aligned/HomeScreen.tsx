@@ -168,88 +168,56 @@ export const HomeScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const streakData = await getStreak(tz);
-        if (streakData) setStreak(streakData.current_streak);
-      } catch (e) {
-        console.log("Error fetching streak:", e);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const today = new Date().toLocaleDateString('en-US', {
+        month: '2-digit', day: '2-digit', year: 'numeric'
+      }).replace(/\//g, '.');
+
+      // Fix #10: Run all API calls in parallel instead of sequentially
+      const [streakData, qData, checkinData, summary, moods, opts, rituals] = await Promise.all([
+        getStreak(tz).catch((e: any) => { console.log("Error fetching streak:", e); return null; }),
+        getQuestionsEndpoint().catch((e: any) => { console.log("Error fetching questions:", e); return null; }),
+        getCheckin(today).catch((e: any) => { console.log("Error fetching existing checkin:", e); return null; }),
+        getAlignedSyncSummary(tz).catch((e: any) => { console.log("Error fetching sync summary:", e); return null; }),
+        getCurrentMood().catch((e: any) => { console.log("Error fetching current mood:", e); return null; }),
+        getMoodList().catch((e: any) => { console.log("Error fetching mood list:", e); return null; }),
+        getPartnerRituals(1, 100, tz).catch((e: any) => { console.log("Error fetching partner rituals:", e); return null; }),
+      ]);
+
+      if (streakData) setStreak(streakData.current_streak);
+
+      if (qData?.data) setQuestions(qData.data);
+
+      if (checkinData?.data) {
+        if (checkinData.data.my_check_in) {
+          setCheckinQ1(checkinData.data.my_check_in.answer_1);
+          setCheckinQ2(checkinData.data.my_check_in.answer_2);
+          setCheckinQ3(checkinData.data.my_check_in.answer_3);
+          setHasCheckedInToday(true);
+        }
+        if (checkinData.data.partner_check_in) {
+          setPartnerCheckin(checkinData.data.partner_check_in);
+        }
       }
 
-      try {
-        const qData = await getQuestionsEndpoint();
-        if (qData && qData.data) {
-          setQuestions(qData.data);
-        }
-      } catch (e) {
-        console.log("Error fetching questions:", e);
+      if (summary) {
+        setSyncData(summary);
+        setWeScore(summary.overall_score);
       }
 
-      try {
-        const today = new Date().toLocaleDateString('en-US', {
-          month: '2-digit', day: '2-digit', year: 'numeric'
-        }).replace(/\//g, '.');
-        const checkinData = await getCheckin(today);
-        if (checkinData && checkinData.data) {
-          if (checkinData.data.my_check_in) {
-            setCheckinQ1(checkinData.data.my_check_in.answer_1);
-            setCheckinQ2(checkinData.data.my_check_in.answer_2);
-            setCheckinQ3(checkinData.data.my_check_in.answer_3);
-            setHasCheckedInToday(true);
-          }
-          if (checkinData.data.partner_check_in) {
-            setPartnerCheckin(checkinData.data.partner_check_in);
-          }
-        }
-      } catch (e) {
-        console.log("Error fetching existing checkin:", e);
+      if (moods?.data) {
+        const mine = moods.data.find((m: any) => !m.is_partner);
+        const theirs = moods.data.find((m: any) => m.is_partner);
+        if (mine) setMyMood(mine);
+        if (theirs) setPartnerMood(theirs);
       }
 
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const summary = await getAlignedSyncSummary(tz);
-        if (summary) {
-          setSyncData(summary);
-          setWeScore(summary.overall_score);
-        }
-      } catch (e) {
-        console.log("Error fetching sync summary:", e);
-      }
-      
-      try {
-        const moods = await getCurrentMood();
-        if (moods && moods.data) {
-          const mine = moods.data.find((m: any) => !m.is_partner);
-          const theirs = moods.data.find((m: any) => m.is_partner);
-          if (mine) setMyMood(mine);
-          if (theirs) {
-             setPartnerMood(theirs);
-          }
-        }
-      } catch (e) {
-        console.log("Error fetching current mood:", e);
-      }
+      if (opts?.data) setMoodOptions(opts.data);
+      setIsLoadingMood(false);
 
-      try {
-        const opts = await getMoodList();
-        if (opts && opts.data) {
-          setMoodOptions(opts.data);
-        }
-      } catch (e) {
-        console.log("Error fetching mood list:", e);
-      } finally {
-        setIsLoadingMood(false);
-      }
-      
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const res = await getPartnerRituals(1, 100, tz);
-        if (res && res.data) {
-          setPartnerRitualHistory(res.data);
-          setHasPartnerRituals(res.data.filter((r: any) => !r.is_hidden).length > 0);
-        }
-      } catch (e) {
-        console.log("Error fetching partner rituals:", e);
+      if (rituals?.data) {
+        setPartnerRitualHistory(rituals.data);
+        setHasPartnerRituals(rituals.data.filter((r: any) => !r.is_hidden).length > 0);
       }
       
       };

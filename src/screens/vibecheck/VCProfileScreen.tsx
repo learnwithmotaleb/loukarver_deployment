@@ -728,17 +728,32 @@ export const VCProfileScreen: React.FC = () => {
                     onPress={() => !isActive && handleSelectPicture(item.id || item.url)}
                     style={{ position: 'relative' }}
                   >
-                    <Image
-                      source={{ uri: itemUrl || undefined }}
-                      style={{
-                        width: 140,
-                        height: 140,
-                        borderRadius: 70,
-                        borderWidth: isActive ? 2 : 1,
-                        borderColor: isActive ? Colors.accent : '#444',
-                      }}
-                      resizeMode="cover"
-                    />
+                    {itemUrl ? (
+                      <Image
+                        source={{ uri: itemUrl }}
+                        style={{
+                          width: 140,
+                          height: 140,
+                          borderRadius: 70,
+                          borderWidth: isActive ? 2 : 1,
+                          borderColor: isActive ? Colors.accent : '#444',
+                        }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 140,
+                          height: 140,
+                          borderRadius: 70,
+                          borderWidth: 1,
+                          borderColor: '#444',
+                          backgroundColor: '#2A2A2E',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      />
+                    )}
                     {isActive && (
                       <View
                         style={{

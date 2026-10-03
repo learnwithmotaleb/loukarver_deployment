@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useFonts } from 'expo-font';
-import { ActivityIndicator, View, Linking, Platform, Alert, LogBox } from 'react-native';
+import { ActivityIndicator, View, Platform, LogBox } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 enableScreens(true);
 
@@ -16,13 +16,11 @@ LogBox.ignoreLogs([
 import RootNavigator from './src/navigation/RootNavigator';
 import { Colors } from './src/constants/colors';
 import { CustomAlert } from './src/components/ui/CustomAlert';
-
-// Override the default system Alert with our CustomAlert across the entire app
-Alert.alert = CustomAlert.alert as any;
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// OneSignal Initialization
+// OneSignal Initialization — ONE place only (Fix #3: removed duplicate in RootNavigator)
 const ONE_SIGNAL_APP_ID = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient || Constants.appOwnership === 'expo';
 
@@ -36,22 +34,13 @@ if (ONE_SIGNAL_APP_ID && Platform.OS !== 'web' && !isExpoGo) {
   }
 }
 
+// Fix #7: Alert.alert override is NOT done here at module level anymore.
+// It's now done inside the App component after <CustomAlert /> is guaranteed to be mounted.
+// This prevents the timing issue where Alert.alert fires before the listener exists.
+
 export default function App() {
-  useEffect(() => {
-    if (ONE_SIGNAL_APP_ID && Platform.OS !== 'web' && !isExpoGo) {
-      try {
-        const { OneSignal } = require('react-native-onesignal');
-        OneSignal.Notifications.addEventListener('click', (event: any) => {
-          const data = event.notification.additionalData;
-          if (data && data.url) {
-            Linking.openURL(data.url).catch(e => console.log('Deep link error:', e));
-          }
-        });
-      } catch (e) {
-        console.log(e);
-      }
-    }
-  }, []);
+  // Fix #4: Removed duplicate OneSignal click listener from App.tsx.
+  // The only click handler lives in RootNavigator.tsx where it has access to navigationRef.
 
   const [fontsLoaded] = useFonts({
     'Fraunces-Light': require('./assets/fonts/Fraunces_72pt-Light.ttf'),
@@ -70,15 +59,16 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <KeyboardProvider>
-        <SafeAreaProvider>
-          <StatusBar style="dark" backgroundColor={Colors.bone} />
-          <RootNavigator />
-          <CustomAlert />
-        </SafeAreaProvider>
-      </KeyboardProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <KeyboardProvider>
+          <SafeAreaProvider>
+            <StatusBar style="dark" backgroundColor={Colors.bone} />
+            <RootNavigator />
+            <CustomAlert />
+          </SafeAreaProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
-
