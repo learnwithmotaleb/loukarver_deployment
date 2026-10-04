@@ -49,8 +49,9 @@ export const Onboarding: React.FC = () => {
       nav.navigate("AlignedApp");
     });
     const subQR = DeviceEventEmitter.addListener('QR_CODE_SCANNED', (scannedData) => {
-      if (scannedData) {
-        sendAlignmentRequest(scannedData).then(() => {
+      const cleanKey = typeof scannedData === 'string' ? scannedData.trim().toUpperCase() : scannedData;
+      if (cleanKey) {
+        sendAlignmentRequest(cleanKey).then(() => {
           Alert.alert("Request Sent", "Connection request sent to your partner. Waiting for their approval!");
           nav.navigate("AlignedApp");
         }).catch((e: any) => {
