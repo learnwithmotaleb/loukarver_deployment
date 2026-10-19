@@ -9,6 +9,7 @@ import { getMe } from '../../services/authApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { BottomSheet } from '../ui/BottomSheet';
+import { AlignedNotificationSheet } from '../ui/AlignedNotificationSheet';
 import { AppTextInput } from '../ui/AppTextInput';
 import { AppButton } from '../ui/AppButton';
 import { showPartnerPicture } from '../ui/PartnerPictureViewer';
@@ -102,10 +103,6 @@ export const PresenceStrip: React.FC<PresenceStripProps> = ({ onRedirect, refres
   useEffect(() => {
     fetchPresenceData();
 
-    const sub1 = DeviceEventEmitter.addListener('OPEN_PRESENCE_HISTORY', () => {
-      fetchPresenceData();
-      setIsSheetOpen(true);
-    });
     const sub2 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', debouncedFetchPresenceData);
     const sub3 = DeviceEventEmitter.addListener('ALIGNMENT_REQUEST_UPDATED', debouncedFetchPresenceData);
     const sub4 = DeviceEventEmitter.addListener('ALIGNMENT_BONDED', debouncedFetchPresenceData);
@@ -130,7 +127,6 @@ export const PresenceStrip: React.FC<PresenceStripProps> = ({ onRedirect, refres
       if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
       clearInterval(t);
       clearInterval(clockTimer);
-      sub1.remove();
       sub2.remove();
       sub3.remove();
       sub4.remove();
@@ -568,182 +564,11 @@ export const PresenceStrip: React.FC<PresenceStripProps> = ({ onRedirect, refres
         </Pressable>
       </View>
 
-      <BottomSheet
+      <AlignedNotificationSheet
         open={isSheetOpen}
         onClose={() => setIsSheetOpen(false)}
-        title={`${partnerName}'s Activity`}
-        kicker="PRESENCE HISTORY"
-        noScroll
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, paddingHorizontal: 20, marginTop: 10 }}>
-          <Pressable onPress={() => {
-            Alert.alert(
-              "Clear All Notifications",
-              "Are you sure you want to permanently delete all notifications? This action cannot be undone.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Clear All",
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      await clearAllNotifications();
-                      setPresenceNotifications([]);
-                      DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED', 0);
-                      DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                    } catch (e) {
-                      console.log("Error clearing notifications:", e);
-                    }
-                  }
-                }
-              ]
-            );
-          }}>
-            <AppText color={'#D9534F'} size={14} style={{ fontWeight: '600' }}>
-              Clear All
-            </AppText>
-          </Pressable>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            {presenceNotifications.some(n => n.status !== "Seen") && (
-              <Pressable onPress={async () => {
-                try {
-                  await markAllNotificationsSeen();
-                  setPresenceNotifications(prev => prev.map(n => ({ ...n, status: 'Seen' })));
-                  DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED', 0);
-                  DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                } catch (e) {
-                  console.log("Error marking all seen:", e);
-                }
-              }}>
-                <AppText color={Colors.accent} size={13} style={{ fontWeight: '600' }}>
-                  Mark all read
-                </AppText>
-              </Pressable>
-            )}
-            <Pressable onPress={() => setShowHidden(!showHidden)}>
-              <AppText color={Colors.accent} size={14}>
-                {showHidden ? "Back to History" : "Archived"}
-              </AppText>
-            </Pressable>
-          </View>
-        </View>
-        {(() => {
-          const visibleNotifications = presenceNotifications.filter(n => showHidden ? n.is_hidden : !n.is_hidden);
-          return (
-            <ScrollView style={{ maxHeight: 400 }}>
-              {visibleNotifications.length === 0 ? (
-                <AppText color={Colors.muted} style={{ textAlign: 'center', marginTop: 20 }}>
-                  {showHidden ? "No archived activity." : "No recent activity recorded."}
-                </AppText>
-              ) : (
-                visibleNotifications.map((n, idx) => {
-                const isUnread = n.status !== "Seen";
-                const borderC = isUnread ? Colors.accent : Colors.rule;
-                const bgC = isUnread ? '#ffffff' : 'transparent';
-                const isHidden = n.is_hidden;
-
-                const renderLeftActions = () => (
-                  <View style={{ justifyContent: 'center', height: '100%', flex: 1, alignItems: 'flex-start', paddingLeft: 24 }}>
-                    <Ionicons name="trash-outline" size={20} color={'#D9534F'} />
-                    <AppText color={'#D9534F'} variant="mono" style={{ fontSize: 10, marginTop: 4, letterSpacing: 1 }}>DELETE</AppText>
-                  </View>
-                );
-
-                const renderRightActions = () => (
-                  <View style={{ justifyContent: 'center', height: '100%', flex: 1, alignItems: 'flex-end', paddingRight: 24 }}>
-                    <Ionicons name={isHidden ? "archive" : "archive-outline"} size={20} color={Colors.accent} />
-                    <AppText color={Colors.accent} variant="mono" style={{ fontSize: 10, marginTop: 4, letterSpacing: 1 }}>{isHidden ? "UNARCHIVE" : "ARCHIVE"}</AppText>
-                  </View>
-                );
-
-                return (
-                  <View key={n.id || idx} style={{ marginBottom: 16 }}>
-                    <Swipeable
-                      ref={ref => {
-                        if (ref) rowRefs.current[n.id] = ref;
-                      }}
-                      renderLeftActions={renderLeftActions}
-                      renderRightActions={renderRightActions}
-                      overshootLeft={true}
-                      overshootRight={true}
-                      friction={1.5}
-                      onSwipeableLeftOpen={async () => {
-                        await deleteNotification(n.id);
-                        setPresenceNotifications(prev => prev.filter(x => x.id !== n.id));
-                        DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED');
-                        DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                        setTimeout(() => {
-                          if (rowRefs.current[n.id]) {
-                            rowRefs.current[n.id].close();
-                          }
-                        }, 200);
-                      }}
-                      onSwipeableRightOpen={async () => {
-                        if (isHidden) {
-                          await unhideNotification(n.id);
-                          setPresenceNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_hidden: false } : x));
-                          DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                        } else {
-                          await hideNotification(n.id);
-                          setPresenceNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_hidden: true } : x));
-                          DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                        }
-                        setTimeout(() => {
-                          if (rowRefs.current[n.id]) {
-                            rowRefs.current[n.id].close();
-                          }
-                        }, 200);
-                      }}
-                    >
-                      <Pressable
-                        style={({ pressed }) => [
-                          { backgroundColor: bgC, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: borderC, marginHorizontal: 20 },
-                          pressed && { opacity: 0.7 }
-                        ]}
-                        onPress={async () => {
-                          if (isUnread) {
-                            // Optimistically mark this single notification as seen immediately
-                            setPresenceNotifications(prev => {
-                              const newList = [...prev];
-                              const index = newList.findIndex(x => x.id === n.id);
-                              if (index > -1) newList[index] = { ...newList[index], status: "Seen" };
-                              return newList;
-                            });
-                            DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED');
-                            DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
-                            try {
-                              await markNotificationSeen(n.id);
-                            } catch (err) {
-                              console.log('Error marking notification as seen:', err);
-                            }
-                          }
-                          handleNotificationDeepLink(n, nav, () => setIsSheetOpen(false));
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                            {isUnread && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.accent, marginRight: 6, marginTop: 2 }} />}
-                            <AppText variant="serifItalic" size={16} color={Colors.ink} style={{ fontWeight: isUnread ? "bold" : "normal" }}>
-                              {n.type === 'Presence' && !n.message.toLowerCase().includes(partnerName.toLowerCase()) ? `${partnerName} is ${n.message}` : n.message}
-                            </AppText>
-                          </View>
-                          <AppText variant="mono" color={Colors.muted} style={{ fontSize: 11, marginLeft: 8, paddingTop: 4 }}>
-                            {formatTime(new Date(n.created_at))}
-                          </AppText>
-                        </View>
-                        <AppText variant="smallCaps" color={Colors.muted} style={{ marginTop: 4, marginLeft: isUnread ? 12 : 0 }}>
-                          {new Date(n.created_at).toLocaleDateString()}
-                        </AppText>
-                      </Pressable>
-                    </Swipeable>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-          );
-        })()}
-      </BottomSheet>
+        partnerName={partnerName}
+      />
 
     </>
   );

@@ -21,6 +21,44 @@ import { showPartnerPicture } from "@/components/ui/PartnerPictureViewer";
 import { createDate, listDates, respondToDate, completeDate, addReview, updateReview, updateDate, pingDate, requestCancelDate, cancelDate, requestDeletePhoto, approveDeletePhoto, rejectDeletePhoto, deleteDate, suggestDateVenue } from "../../services/datesApi";
 import { getMe } from "../../services/authApi";
 import api from "../../services/api";
+import Svg, { Path, Circle, Polygon } from 'react-native-svg';
+
+const FilterIcon = ({ color = Colors.ink, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </Svg>
+);
+
+const SortLatestIcon = ({ color = Colors.bone, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 16l4 4 4-4" />
+    <Path d="M7 20V4" />
+    <Path d="M11 4h10" />
+    <Path d="M11 8h7" />
+    <Path d="M11 12h4" />
+  </Svg>
+);
+
+const SortOldestIcon = ({ color = Colors.bone, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 8l4-4 4 4" />
+    <Path d="M7 4v16" />
+    <Path d="M11 12h4" />
+    <Path d="M11 16h7" />
+    <Path d="M11 20h10" />
+  </Svg>
+);
+
+const SortUpcomingIcon = ({ color = Colors.bone, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5" />
+    <Path d="M16 2v4" />
+    <Path d="M8 2v4" />
+    <Path d="M3 10h18" />
+    <Circle cx="17" cy="17" r="4.5" />
+    <Path d="M17 15v2.2l1.2 1" />
+  </Svg>
+);
 
 export const DatesScreen: React.FC = () => {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -79,7 +117,8 @@ export const DatesScreen: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [sortOrder, setSortOrder] = useState<"Upcoming First" | "Latest First">("Upcoming First");
+  const [sortOrder, setSortOrder] = useState<"Upcoming First" | "Latest First" | "Oldest First">("Latest First");
+  const [showFilterBar, setShowFilterBar] = useState(false);
   const [dismissedPrompts, setDismissedPrompts] = useState<string[]>([]);
   
   useEffect(() => {
@@ -516,21 +555,21 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
 
     return (
       <View style={{ 
-        marginBottom: 32, 
-        paddingVertical: 20,
+        marginBottom: 16, 
+        paddingVertical: 14,
         paddingHorizontal: 16,
         backgroundColor: Colors.transparent, 
         borderWidth: 1,
         borderColor: Colors.rule,
-        borderRadius: 16, 
+        borderRadius: 14, 
         alignItems: 'center' 
       }}>
-        <AppText variant="smallCaps" color={Colors.muted} style={{ marginBottom: 12, letterSpacing: 2 }}>Next Date In</AppText>
-        <AppText variant="display" size={32} color={Colors.ink}>
-          {parts.D > 0 && <><AppText variant="display" size={32} color={Colors.accent}>{parts.D}</AppText>D {' '}</>}
-          {(parts.D > 0 || parts.H > 0) && <><AppText variant="display" size={32} color={Colors.accent}>{String(parts.H).padStart(2, '0')}</AppText>H {' '}</>}
-          {(parts.D > 0 || parts.H > 0 || parts.M > 0) && <><AppText variant="display" size={32} color={Colors.accent}>{String(parts.M).padStart(2, '0')}</AppText>M {' '}</>}
-          <AppText variant="display" size={32} color={Colors.accent}>{String(parts.S).padStart(2, '0')}</AppText>S
+        <AppText variant="smallCaps" color={Colors.muted} style={{ marginBottom: 8, letterSpacing: 1.5, fontSize: 10 }}>Next Date In</AppText>
+        <AppText variant="display" size={26} color={Colors.ink}>
+          {parts.D > 0 && <><AppText variant="display" size={26} color={Colors.accent}>{parts.D}</AppText>D {' '}</>}
+          {(parts.D > 0 || parts.H > 0) && <><AppText variant="display" size={26} color={Colors.accent}>{String(parts.H).padStart(2, '0')}</AppText>H {' '}</>}
+          {(parts.D > 0 || parts.H > 0 || parts.M > 0) && <><AppText variant="display" size={26} color={Colors.accent}>{String(parts.M).padStart(2, '0')}</AppText>M {' '}</>}
+          <AppText variant="display" size={26} color={Colors.accent}>{String(parts.S).padStart(2, '0')}</AppText>S
         </AppText>
       </View>
     );
@@ -579,15 +618,7 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
   }
 
   const listHeaderNode = (
-    <View style={styles.inner}>
-      <AppText variant="display" size={42} style={{ lineHeight: 42, marginBottom: 6 }}>
-        Dates
-        <AppText size={42} color={Colors.accent}>.</AppText>
-      </AppText>
-      <AppText variant="serifItalic" size={16} color={Colors.muted} style={{ lineHeight: 24, marginBottom: 24 }}>
-        Intentional time, well-spent.
-      </AppText>
-
+    <View style={styles.headerWrapper}>
       {displayMode === 'timer' && targetDisplayDate && targetDisplayDate.utc_timestamp && (
         <TimerDisplay targetDate={targetDisplayDate.utc_timestamp} />
       )}
@@ -596,125 +627,178 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
         <CompletionPrompt dateEntry={mapDateToEntry(targetDisplayDate)} />
       )}
 
-      {/* ==================== DATE GENERATOR COMPACT ==================== */}
-      <Pressable style={styles.generatorCard} onPress={() => {
-        if (!user?.is_aligned && !user?.partner) {
-          Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
-          return;
-        }
-        setCity("");
-        setMood("Romantic");
-        setVibe("Outdoorsy");
-        setExactDate(new Date());
-        setExactTime(new Date());
-        setMeetType("location");
-        setGeneratorSheet(true);
-      }}>
-        <View style={[styles.genHeader, { borderBottomWidth: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-          <AppText variant="smallCaps" color={Colors.ink}>
-            ♦ GENERATE DATE
-          </AppText>
-          <AppText variant="smallCaps" color={Colors.muted}>
-            TAP TO START
-          </AppText>
+      {/* FLOATING RECTANGULAR CARD MATCHING MAPSCREEN */}
+      <View style={styles.floatingHeaderCard}>
+        {/* Row 1: Header Title, Subtitle & Refresh Icon */}
+        <View style={styles.headerTopRow}>
+          <View>
+            <AppText variant="display" size={24} style={{ lineHeight: 26 }}>
+              Dates<AppText size={24} color={Colors.accent}>.</AppText>
+            </AppText>
+            <AppText variant="serifItalic" size={12} color={Colors.muted} style={{ lineHeight: 16 }}>
+              Intentional time, well-spent.
+            </AppText>
+          </View>
+
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => loadDates(1, false, true)}
+            hitSlop={8}
+          >
+            <Ionicons name="refresh-outline" size={16} color={Colors.ink} />
+          </Pressable>
         </View>
-      </Pressable>
 
+        {/* Row 2: Action Row (Propose Date [Primary] & AI Generate [Sub]) */}
+        <View style={styles.actionRow}>
+          {/* Main Point: Propose Date */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.primaryProposeBtn,
+              pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }
+            ]}
+            onPress={() => {
+              if (!user?.is_aligned && !user?.partner) {
+                Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
+                return;
+              }
+              setSheet("manual");
+            }}
+          >
+            <Ionicons name="add" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+            <AppText variant="smallCaps" size={10} style={{ color: '#FFFFFF', fontWeight: '700', letterSpacing: 0.6 }}>
+              Propose Date
+            </AppText>
+          </Pressable>
 
+          {/* Sub Feature: AI Generate */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.subGenerateBtn,
+              pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }
+            ]}
+            onPress={() => {
+              if (!user?.is_aligned && !user?.partner) {
+                Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
+                return;
+              }
+              setCity("");
+              setMood("Romantic");
+              setVibe("Outdoorsy");
+              setExactDate(new Date());
+              setExactTime(new Date());
+              setMeetType("location");
+              setGeneratorSheet(true);
+            }}
+          >
+            <AppText style={{ fontSize: 11, marginRight: 4, color: Colors.accent }}>✦</AppText>
+            <AppText variant="smallCaps" size={10} color={Colors.ink} style={{ letterSpacing: 0.5 }}>
+              AI Generate
+            </AppText>
+          </Pressable>
+        </View>
 
-      <AppText variant="smallCaps" color={Colors.ink2} style={{ marginBottom: 8, marginTop: 28 }}>
-        Dates
-      </AppText>
-      
-      {/* Search and Filters */}
-      <View style={{ marginBottom: 20 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <View style={{ 
-            flex: 1, 
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: Colors.transparent, 
-            borderWidth: 1, 
-            borderColor: Colors.rule, 
-            borderRadius: 50, 
-            paddingHorizontal: 16, 
-            height: 48
-          }}>
-            <Ionicons name="search-outline" size={20} color={Colors.muted} style={{ marginRight: 8 }} />
+        {/* Row 3: Compact Search Box, Circular Filter Button & Circular Sort Button */}
+        <View style={styles.searchSortRow}>
+          <View style={styles.compactSearchBox}>
+            <Ionicons name="search" size={13} color={Colors.muted} style={{ marginRight: 4 }} />
             <TextInput 
               value={searchInput} 
               onChangeText={setSearchInput} 
               placeholder="Search by name, city, vibe..." 
-              placeholderTextColor="#b3b3b3"
-              style={{ flex: 1, fontSize: 14, color: Colors.ink, paddingVertical: 0 }}
+              placeholderTextColor={Colors.muted}
+              style={styles.compactSearchInput}
+              autoCorrect={false}
+              returnKeyType="search"
             />
+            {searchInput.length > 0 && (
+              <Pressable onPress={() => setSearchInput("")} hitSlop={6}>
+                <Ionicons name="close-circle" size={14} color={Colors.muted} />
+              </Pressable>
+            )}
           </View>
+
+          {/* Circular Filter Button */}
+          <Pressable
+            onPress={() => setShowFilterBar(prev => !prev)}
+            style={[
+              styles.circleActionBtn,
+              (showFilterBar || statusFilter !== "All") && styles.circleActionBtnActive
+            ]}
+            hitSlop={6}
+          >
+            <FilterIcon 
+              color={(showFilterBar || statusFilter !== "All") ? Colors.bone : Colors.ink} 
+              size={15} 
+            />
+            {statusFilter !== "All" && <View style={styles.filterActiveDot} />}
+          </Pressable>
+
+          {/* Circular Sort Button (Cycles: Latest -> Upcoming -> Oldest) */}
           <Pressable 
             onPress={() => {
               setSortOrder(prev => {
-                const nextSort = prev === "Upcoming First" ? "Latest First" : "Upcoming First";
-                if (nextSort === "Upcoming First" && (statusFilter === "Completed" || statusFilter === "Rejected")) {
+                const nextSort = prev === "Latest First" 
+                  ? "Upcoming First" 
+                  : prev === "Upcoming First" 
+                    ? "Oldest First" 
+                    : "Latest First";
+                if (nextSort === "Upcoming First" && (statusFilter === "Completed" || statusFilter === "Rejected" || statusFilter === "Reviewed")) {
                   setStatusFilter("All");
                 }
                 return nextSort;
               });
             }}
-            style={{ 
-              height: 48,
-              paddingHorizontal: 16, 
-              borderRadius: 50, 
-              backgroundColor: Colors.ink, 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              flexDirection: 'row',
-              gap: 6
-            }}
+            style={[styles.circleActionBtn, styles.circleActionBtnActive]}
+            hitSlop={6}
           >
-             <Ionicons name="swap-vertical" size={16} color={Colors.bone} />
-             <AppText variant="smallCaps" color={Colors.bone} size={10}>{sortOrder === "Upcoming First" ? "Upcoming" : "Latest"}</AppText>
+            {sortOrder === "Latest First" && <SortLatestIcon color={Colors.bone} size={15} />}
+            {sortOrder === "Upcoming First" && <SortUpcomingIcon color={Colors.bone} size={15} />}
+            {sortOrder === "Oldest First" && <SortOldestIcon color={Colors.bone} size={15} />}
           </Pressable>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {["All", "Pending", "Invited", "Accepted", "Completed", "Reviewed", "Rejected"]
-            .filter(status => sortOrder !== "Upcoming First" || (status !== "Completed" && status !== "Rejected" && status !== "Reviewed"))
-            .map(status => (
-              <Pressable
-                key={status}
-                onPress={() => setStatusFilter(status)}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  backgroundColor: statusFilter === status ? Colors.ink : Colors.transparent,
-                  borderWidth: 1,
-                  borderColor: statusFilter === status ? Colors.ink : Colors.rule
-                }}
-              >
-                <AppText variant="smallCaps" style={{ color: statusFilter === status ? Colors.bone : Colors.muted, fontSize: 10 }}>
-                  {status}
-                </AppText>
-              </Pressable>
-            ))}
-        </ScrollView>
+
+        {/* Row 4: Horizontal Status Filter Chips (Toggled via Filter Button) */}
+        {showFilterBar && (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.filterScrollContent}
+          >
+            {["All", "Pending", "Invited", "Accepted", "Completed", "Reviewed", "Rejected"]
+              .filter(status => sortOrder !== "Upcoming First" || (status !== "Completed" && status !== "Rejected" && status !== "Reviewed"))
+              .map(status => {
+                const isActive = statusFilter === status;
+                return (
+                  <Pressable
+                    key={status}
+                    onPress={() => setStatusFilter(status)}
+                    style={[
+                      styles.floatingFilterChip,
+                      isActive && styles.floatingFilterChipActive
+                    ]}
+                  >
+                    <AppText 
+                      variant="smallCaps" 
+                      style={{ 
+                        color: isActive ? '#FFFFFF' : Colors.ink, 
+                        fontSize: 10,
+                        letterSpacing: 0.5
+                      }}
+                    >
+                      {status}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+          </ScrollView>
+        )}
       </View>
     </View>
   );
 
   const listFooterNode = (
-    <View style={styles.inner}>
-      <Pressable style={styles.addBtn} onPress={() => {
-        if (!user?.is_aligned && !user?.partner) {
-          Alert.alert("Partner Required", "Please connect with your partner first to propose dates.");
-          return;
-        }
-        setSheet("manual");
-      }}>
-        <AppText variant="smallCaps" color={Colors.accent}>
-          + Propose manually
-        </AppText>
-      </Pressable>
-      <View style={{ height: 80 }} />
-    </View>
+    <View style={{ height: 90 }} />
   );
 
   const pickImages = async () => {
@@ -751,7 +835,7 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
         data={dates}
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => (
-          <View style={{ paddingHorizontal: 20 }}>
+          <View style={{ paddingHorizontal: 12 }}>
             <DateCard
               entry={mapDateToEntry(item)}
               index={index}
@@ -1136,102 +1220,100 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
 
       {/* Generator sheet */}
       <BottomSheet open={generatorSheet} onClose={() => setGeneratorSheet(false)} kicker="DATE GENERATOR" title="Generate a Date">
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-          {/* 01 CITY */}
-          <AppTextInput
-            label="CITY"
-            n="01"
-            value={city}
-            onChangeText={setCity}
-            placeholder="Los Angeles"
-          />
+        {/* 01 CITY */}
+        <AppTextInput
+          label="CITY"
+          n="01"
+          value={city}
+          onChangeText={setCity}
+          placeholder="Los Angeles"
+        />
 
-          {/* 02 MOOD */}
-          <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-            02 MOOD
-          </AppText>
-          <View style={styles.chipRow}>
-            {moods.map((m) => (
-              <Pressable
-                key={m}
-                style={[styles.chip, mood === m && styles.chipSelected]}
-                onPress={() => setMood(m)}
-              >
-                <AppText variant="smallCaps" style={{ color: mood === m ? "#fff" : Colors.muted, fontSize: 10 }}>{m}</AppText>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* 03 VIBE */}
-          <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-            03 VIBE
-          </AppText>
-          <View style={styles.chipRow}>
-            {vibes.map((v) => (
-              <Pressable
-                key={v}
-                style={[styles.chip, vibe === v && styles.chipSelected]}
-                onPress={() => setVibe(v)}
-              >
-                <AppText variant="smallCaps" style={{ color: vibe === v ? "#fff" : Colors.muted, fontSize: 10 }}>{v}</AppText>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* 04 DATE & TIME */}
-          <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-            04 DATE & TIME
-          </AppText>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable style={[styles.timeRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
-              <AppText variant="display" size={20}>
-                {exactDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </AppText>
-              <Ionicons name="calendar-outline" size={26} color="#000" />
+        {/* 02 MOOD */}
+        <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+          02 MOOD
+        </AppText>
+        <View style={styles.chipRow}>
+          {moods.map((m) => (
+            <Pressable
+              key={m}
+              style={[styles.chip, mood === m && styles.chipSelected]}
+              onPress={() => setMood(m)}
+            >
+              <AppText variant="smallCaps" style={{ color: mood === m ? "#fff" : Colors.muted, fontSize: 10 }}>{m}</AppText>
             </Pressable>
+          ))}
+        </View>
 
-            <Pressable style={styles.timeRow} onPress={() => setShowTimePicker(true)}>
-              <AppText variant="display" size={20}>
-                {formatTime(exactTime)}
-              </AppText>
-              <Ionicons name="time-outline" size={26} color="#000" />
+        {/* 03 VIBE */}
+        <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+          03 VIBE
+        </AppText>
+        <View style={styles.chipRow}>
+          {vibes.map((v) => (
+            <Pressable
+              key={v}
+              style={[styles.chip, vibe === v && styles.chipSelected]}
+              onPress={() => setVibe(v)}
+            >
+              <AppText variant="smallCaps" style={{ color: vibe === v ? "#fff" : Colors.muted, fontSize: 10 }}>{v}</AppText>
             </Pressable>
-          </View>
-          {showDatePicker && (
-            <DateTimePicker value={exactDate} mode="date" display="default" onChange={handleDateChange} />
-          )}
-          {showTimePicker && (
-            <DateTimePicker value={exactTime} mode="time" display="default" onChange={handleTimeChange} />
-          )}
+          ))}
+        </View>
 
-          {/* 05 HOW WE MEET */}
-          <AppText variant="mono" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-            05 HOW WE MEET
-          </AppText>
-          <View style={styles.meetOptions}>
-            {[
-              { label: "Meet at the location", value: "location" },
-              { label: "I'll pick you up", value: "pickup" },
-              { label: "Pick me up", value: "pickedup" },
-            ].map((option) => (
-              <Pressable
-                key={option.value}
-                style={[styles.meetOption, meetType === option.value && styles.meetSelected]}
-                onPress={() => setMeetType(option.value as any)}
-              >
-                <AppText style={{ color: meetType === option.value ? "#fff" : Colors.ink }}>
-                  {option.label}
-                </AppText>
-                <View style={[styles.radio, meetType === option.value && styles.radioSelected]} />
-              </Pressable>
-            ))}
-          </View>
+        {/* 04 DATE & TIME */}
+        <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+          04 DATE & TIME
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Pressable style={[styles.timeRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
+            <AppText variant="display" size={20}>
+              {exactDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </AppText>
+            <Ionicons name="calendar-outline" size={26} color="#000" />
+          </Pressable>
 
-          {/* GENERATE BUTTON */}
-          <AppButton variant="solid" full size="lg" style={styles.generateBtn} onPress={generateDate} disabled={isGenerating}>
-            {isGenerating ? "Generating..." : "♦ GENERATE DATE"}
-          </AppButton>
-        </ScrollView>
+          <Pressable style={styles.timeRow} onPress={() => setShowTimePicker(true)}>
+            <AppText variant="display" size={20}>
+              {formatTime(exactTime)}
+            </AppText>
+            <Ionicons name="time-outline" size={26} color="#000" />
+          </Pressable>
+        </View>
+        {showDatePicker && (
+          <DateTimePicker value={exactDate} mode="date" display="default" onChange={handleDateChange} />
+        )}
+        {showTimePicker && (
+          <DateTimePicker value={exactTime} mode="time" display="default" onChange={handleTimeChange} />
+        )}
+
+        {/* 05 HOW WE MEET */}
+        <AppText variant="mono" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+          05 HOW WE MEET
+        </AppText>
+        <View style={styles.meetOptions}>
+          {[
+            { label: "Meet at the location", value: "location" },
+            { label: "I'll pick you up", value: "pickup" },
+            { label: "Pick me up", value: "pickedup" },
+          ].map((option) => (
+            <Pressable
+              key={option.value}
+              style={[styles.meetOption, meetType === option.value && styles.meetSelected]}
+              onPress={() => setMeetType(option.value as any)}
+            >
+              <AppText style={{ color: meetType === option.value ? "#fff" : Colors.ink }}>
+                {option.label}
+              </AppText>
+              <View style={[styles.radio, meetType === option.value && styles.radioSelected]} />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* GENERATE BUTTON */}
+        <AppButton variant="solid" full size="lg" style={styles.generateBtn} onPress={generateDate} disabled={isGenerating}>
+          {isGenerating ? "Generating..." : "♦ GENERATE DATE"}
+        </AppButton>
       </BottomSheet>
 
       {/* Manual propose */}
@@ -1473,7 +1555,138 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bone },
-  inner: { padding: 24 },
+  headerWrapper: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 14,
+  },
+  floatingHeaderCard: {
+    backgroundColor: 'rgba(247, 243, 236, 0.94)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.85)',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    shadowColor: Colors.ink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    gap: 8,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EAE2D4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  primaryProposeBtn: {
+    flex: 1.3,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1C1C1E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    shadowColor: Colors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  subGenerateBtn: {
+    flex: 1,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EAE2D4',
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  searchSortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  compactSearchBox: {
+    flex: 1,
+    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFE9DE',
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+  },
+  compactSearchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 13,
+    color: Colors.ink,
+    paddingVertical: 0,
+    paddingHorizontal: 4,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  circleActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EAE2D4',
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  circleActionBtnActive: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.accent,
+  },
+  filterScrollContent: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  floatingFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#EAE2D4',
+    gap: 5,
+  },
+  floatingFilterChipActive: {
+    backgroundColor: '#1C1C1E',
+  },
   generatorCard: { borderRadius: 14, borderWidth: 1, borderColor: Colors.rule, overflow: "hidden", backgroundColor: Colors.bone, marginBottom: 28 },
   genHeader: { padding: 14, borderBottomWidth: 1, borderBottomColor: Colors.rule, backgroundColor: Colors.cream },
   gridContainer: { flexDirection: "row", gap: 12, marginVertical: 8 },
@@ -1491,7 +1704,7 @@ const styles = StyleSheet.create({
   addBtn: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.rule, marginTop: 4 },
   proposalBlock: { padding: 18, borderRadius: 14, backgroundColor: Colors.cream, marginBottom: 22, borderWidth: 1, borderColor: Colors.rule },
   sheetActions: { flexDirection: "row", gap: 10 },
-  starsRow: { flexDirection: "row", justifyContent: "center", gap: 10, paddingVertical: 20, marginBottom: 20 },
+  starsRow: { flexDirection: "row", justifyContent: "center", gap: 10, paddingTop: 8, paddingBottom: 20, marginBottom: 20 },
   delayChip: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 8, backgroundColor: "#EAE2D4" },
   delayChipActive: { backgroundColor: "#1C1C1E", borderColor: "#1C1C1E" }
 });

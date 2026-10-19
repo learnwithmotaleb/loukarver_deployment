@@ -24,6 +24,13 @@ import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { Modal, useWindowDimensions } from "react-native";
 import * as Location from 'expo-location';
+import Svg, { Polygon } from 'react-native-svg';
+
+const FilterIcon = ({ color = Colors.ink, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </Svg>
+);
 
 interface UIMapPin extends MapPin {
   creator_name?: string;
@@ -90,6 +97,7 @@ export const MapScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const [filter, setFilter] = useState<string>("all");
+  const [showFilterBar, setShowFilterBar] = useState(false);
   const [selected, setSelected] = useState<UIMapPin | null>(null);
   const [sheet, setSheet] = useState<string | null>(null);
   const [meetType, setMeetType] = useState<PinType>("together");
@@ -858,94 +866,29 @@ export const MapScreen: React.FC = () => {
 
           {/* FLOATING TOP HEADER & STATS CARD */}
           <View style={styles.floatingHeaderCard}>
-            {/* Row 1: Header, Place Count, Compact Search Box & Refresh */}
+            {/* Row 1: Header Title, Subtitle & Refresh Icon */}
             <View style={styles.headerTopRow}>
-              <AppText variant="display" size={24} style={{ lineHeight: 26 }}>
-                Map
-                <AppText size={24} color={Colors.accent}>
-                  .
+              <View>
+                <AppText variant="display" size={24} style={{ lineHeight: 26 }}>
+                  Map
+                  <AppText size={24} color={Colors.accent}>
+                    .
+                  </AppText>
                 </AppText>
-              </AppText>
-
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginLeft: 8, gap: 6 }}>
-                {/* Compact Search Box replacing the top Add button */}
-                <View style={styles.compactSearchBox}>
-                  <Ionicons name="search" size={13} color={Colors.muted} style={{ marginRight: 4 }} />
-                  <TextInput
-                    style={styles.compactSearchInput}
-                    placeholder="Search city, place..."
-                    placeholderTextColor={Colors.muted}
-                    value={mapSearchQuery}
-                    onChangeText={handleMapSearchChange}
-                    onFocus={() => setIsSearchFocused(true)}
-                    autoCorrect={false}
-                    returnKeyType="search"
-                  />
-                  {isSearchingMap ? (
-                    <ActivityIndicator size="small" color={Colors.accent} style={{ marginLeft: 4 }} />
-                  ) : mapSearchQuery.length > 0 ? (
-                    <Pressable
-                      onPress={() => {
-                        setMapSearchQuery("");
-                        setMapSearchResults([]);
-                        setSearchedLocation(null);
-                      }}
-                      hitSlop={6}
-                    >
-                      <Ionicons name="close-circle" size={14} color={Colors.muted} />
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                {/* Quick Refresh Icon */}
-                <Pressable
-                  style={styles.iconBtn}
-                  onPress={() => loadMapData(false)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="refresh-outline" size={16} color={Colors.ink} />
-                </Pressable>
+                <AppText variant="serifItalic" size={12} color={Colors.muted} style={{ lineHeight: 16 }}>
+                  Every place, pin & memory.
+                </AppText>
               </View>
+
+              {/* Quick Refresh Icon */}
+              <Pressable
+                style={styles.iconBtn}
+                onPress={() => loadMapData(false)}
+                hitSlop={8}
+              >
+                <Ionicons name="refresh-outline" size={16} color={Colors.ink} />
+              </Pressable>
             </View>
-
-            {/* Live Search Suggestions Dropdown */}
-            {mapSearchResults.length > 0 && (
-              <View style={styles.searchDropdownCard}>
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  style={{ maxHeight: 210 }}
-                  nestedScrollEnabled
-                >
-                  {mapSearchResults.map((item, idx) => (
-                    <Pressable
-                      key={item.id || idx}
-                      style={[
-                        styles.searchResultItem,
-                        idx < mapSearchResults.length - 1 && styles.searchResultBorder
-                      ]}
-                      onPress={() => handleSelectSearchResult(item)}
-                    >
-                      <View style={[styles.searchResultIconWrap, item.isSaved && { backgroundColor: `${Colors.accent}20` }]}>
-                        <Ionicons
-                          name={item.isSaved ? "heart" : "location-outline"}
-                          size={15}
-                          color={item.isSaved ? Colors.accent : Colors.ink}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <AppText variant="heading" size={13} color={Colors.ink} numberOfLines={1}>
-                          {item.title}
-                        </AppText>
-                        <AppText variant="mono" size={8} color={Colors.muted} numberOfLines={1}>
-                          {item.subtitle}
-                        </AppText>
-                      </View>
-                      <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
 
             {/* Row 2: Compact Inline Stats Strip */}
             <View style={styles.statsStrip}>
@@ -989,42 +932,130 @@ export const MapScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Row 3: Horizontal Category Filters with Pin Color Dots */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterScrollContent}
-            >
-              {TYPE_FILTERS.map((t) => {
-                const isActive = filter === t;
-                const dotColor = t === 'all' ? Colors.ink : PIN_COLORS[t];
-                return (
+            {/* Row 3: Compact Search Box & Circular Filter Button */}
+            <View style={styles.searchFilterRow}>
+              <View style={styles.compactSearchBox}>
+                <Ionicons name="search" size={13} color={Colors.muted} style={{ marginRight: 4 }} />
+                <TextInput
+                  style={styles.compactSearchInput}
+                  placeholder="Search city, place..."
+                  placeholderTextColor={Colors.muted}
+                  value={mapSearchQuery}
+                  onChangeText={handleMapSearchChange}
+                  onFocus={() => setIsSearchFocused(true)}
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+                {isSearchingMap ? (
+                  <ActivityIndicator size="small" color={Colors.accent} style={{ marginLeft: 4 }} />
+                ) : mapSearchQuery.length > 0 ? (
                   <Pressable
-                    key={t}
-                    onPress={() => setFilter(t)}
-                    style={[
-                      styles.floatingFilterChip,
-                      isActive && styles.floatingFilterChipActive,
-                    ]}
+                    onPress={() => {
+                      setMapSearchQuery("");
+                      setMapSearchResults([]);
+                      setSearchedLocation(null);
+                    }}
+                    hitSlop={6}
                   >
-                    {t !== 'all' && (
-                      <View style={[styles.filterChipDot, { backgroundColor: dotColor }]} />
-                    )}
-                    <AppText
-                      variant="smallCaps"
-                      size={10}
-                      style={{
-                        color: isActive ? '#FFFFFF' : Colors.ink,
-                        fontWeight: isActive ? '700' : '500',
-                        letterSpacing: 0.5,
-                      }}
-                    >
-                      {t.toUpperCase()}
-                    </AppText>
+                    <Ionicons name="close-circle" size={14} color={Colors.muted} />
                   </Pressable>
-                );
-              })}
-            </ScrollView>
+                ) : null}
+              </View>
+
+              {/* Circular Filter Button */}
+              <Pressable
+                onPress={() => setShowFilterBar(prev => !prev)}
+                style={[
+                  styles.circleActionBtn,
+                  (showFilterBar || filter !== "all") && styles.circleActionBtnActive
+                ]}
+                hitSlop={6}
+              >
+                <FilterIcon
+                  color={(showFilterBar || filter !== "all") ? Colors.bone : Colors.ink}
+                  size={15}
+                />
+                {filter !== "all" && <View style={styles.filterActiveDot} />}
+              </Pressable>
+            </View>
+
+            {/* Live Search Suggestions Dropdown */}
+            {mapSearchResults.length > 0 && (
+              <View style={styles.searchDropdownCard}>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  style={{ maxHeight: 210 }}
+                  nestedScrollEnabled
+                >
+                  {mapSearchResults.map((item, idx) => (
+                    <Pressable
+                      key={item.id || idx}
+                      style={[
+                        styles.searchResultItem,
+                        idx < mapSearchResults.length - 1 && styles.searchResultBorder
+                      ]}
+                      onPress={() => handleSelectSearchResult(item)}
+                    >
+                      <View style={[styles.searchResultIconWrap, item.isSaved && { backgroundColor: `${Colors.accent}20` }]}>
+                        <Ionicons
+                          name={item.isSaved ? "heart" : "location-outline"}
+                          size={15}
+                          color={item.isSaved ? Colors.accent : Colors.ink}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="heading" size={13} color={Colors.ink} numberOfLines={1}>
+                          {item.title}
+                        </AppText>
+                        <AppText variant="mono" size={8} color={Colors.muted} numberOfLines={1}>
+                          {item.subtitle}
+                        </AppText>
+                      </View>
+                      <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Row 4: Horizontal Category Filters with Pin Color Dots (Toggled via Filter Button) */}
+            {showFilterBar && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterScrollContent}
+              >
+                {TYPE_FILTERS.map((t) => {
+                  const isActive = filter === t;
+                  const dotColor = t === 'all' ? Colors.ink : PIN_COLORS[t];
+                  return (
+                    <Pressable
+                      key={t}
+                      onPress={() => setFilter(t)}
+                      style={[
+                        styles.floatingFilterChip,
+                        isActive && styles.floatingFilterChipActive,
+                      ]}
+                    >
+                      {t !== 'all' && (
+                        <View style={[styles.filterChipDot, { backgroundColor: dotColor }]} />
+                      )}
+                      <AppText
+                        variant="smallCaps"
+                        size={10}
+                        style={{
+                          color: isActive ? '#FFFFFF' : Colors.ink,
+                          fontWeight: isActive ? '700' : '500',
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {t.toUpperCase()}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
           {/* Searched Location Preview Banner */}
@@ -1958,23 +1989,56 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  searchFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  circleActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EAE2D4',
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  circleActionBtnActive: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.accent,
+  },
   compactSearchBox: {
     flex: 1,
-    maxWidth: 220,
-    height: 32,
+    height: 36,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFE9DE',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: 'rgba(216, 207, 196, 0.75)',
   },
   compactSearchInput: {
     flex: 1,
-    fontSize: 12,
+    height: '100%',
+    fontSize: 13,
     color: Colors.ink,
-    padding: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 4,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   searchDropdownCard: {
     backgroundColor: '#FBF8F3',

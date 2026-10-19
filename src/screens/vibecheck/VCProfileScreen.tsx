@@ -965,6 +965,7 @@ export const VCProfileScreen: React.FC = () => {
         onClose={() => setConnectionsSheet(false)}
         kicker="NETWORK"
         title="Your Connections"
+        noScroll
       >
         <View style={{ flexDirection: 'row', marginBottom: 16, backgroundColor: '#EAE2D4', borderRadius: 8, padding: 4 }}>
           <Pressable 

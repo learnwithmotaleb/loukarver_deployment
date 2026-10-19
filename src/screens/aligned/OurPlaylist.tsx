@@ -248,10 +248,7 @@ const OurPlaylist: React.FC = () => {
             7 TRACKS
           </AppText>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            style={{ maxHeight: 420 }}
-          >
+          <View style={{ marginTop: 8 }}>
             {playlistTracks.map((track, i) => (
               <View key={i} style={bs.trackRow}>
                 <AppText variant="mono" style={bs.trackNum}>
@@ -335,7 +332,7 @@ const OurPlaylist: React.FC = () => {
                    Tracks are matched via ISRC codes across services. When one of you adds a song, it's added to both of your accounts — so you can listen on whichever service you prefer.
                   </AppText>
                 </View>
-          </ScrollView>
+          </View>
         </View>
       </BottomSheet>
 

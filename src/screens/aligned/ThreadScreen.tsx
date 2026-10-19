@@ -1,6 +1,6 @@
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, RefreshControl, DeviceEventEmitter, Alert, Image } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, RefreshControl, DeviceEventEmitter, Alert, Image, TextInput } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { AppText } from '../../components/ui/AppText';
 import { AppButton } from '../../components/ui/AppButton';
@@ -28,6 +28,33 @@ import { createCheckin } from '../../services/checkinApi';
 import { getUserProfile, getPartnerProfile } from '../../services/userApi';
 import { getMe } from '../../services/authApi';
 import { SharedCheckinSheet } from '../../components/shared/SharedCheckinSheet';
+import Svg, { Path, Polygon } from 'react-native-svg';
+
+const FilterIcon = ({ color = Colors.ink, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </Svg>
+);
+
+const SortLatestIcon = ({ color = Colors.bone, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 16l4 4 4-4" />
+    <Path d="M7 20V4" />
+    <Path d="M11 4h10" />
+    <Path d="M11 8h7" />
+    <Path d="M11 12h4" />
+  </Svg>
+);
+
+const SortOldestIcon = ({ color = Colors.bone, size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 8l4-4 4 4" />
+    <Path d="M7 4v16" />
+    <Path d="M11 12h4" />
+    <Path d="M11 16h7" />
+    <Path d="M11 20h10" />
+  </Svg>
+);
 
 const TYPES = ['all', 'partner', 'letter', 'voice', 'photo', 'prompt', 'appreciation', 'checkin'] as const;
 
@@ -45,6 +72,9 @@ export const ThreadScreen: React.FC = () => {
   const route = useRoute<any>();
   const [thread, setThread] = useState<any[]>([]);
   const [filter, setFilter] = useState<typeof TYPES[number]>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilterBar, setShowFilterBar] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"Latest First" | "Oldest First">("Latest First");
 
   useEffect(() => {
     if (route.params?.activeCategory) {
@@ -214,7 +244,7 @@ export const ThreadScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const filtered = filter === 'all'
+  const categoryFiltered = filter === 'all'
     ? thread
     : filter === 'partner'
       ? thread.filter(t => {
@@ -225,6 +255,19 @@ export const ThreadScreen: React.FC = () => {
         const cat = (t.category || t.type || '').toLowerCase();
         return cat === filter.toLowerCase();
       });
+
+  const filtered = categoryFiltered.filter(t => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const text = (t.text || t.content?.text || t.content?.caption || '').toLowerCase();
+    const sender = (t.sender_name || '').toLowerCase();
+    const cat = (t.category || t.type || '').toLowerCase();
+    return text.includes(q) || sender.includes(q) || cat.includes(q);
+  }).sort((a, b) => {
+    const aTime = new Date(a.created_at || a.timestamp || 0).getTime();
+    const bTime = new Date(b.created_at || b.timestamp || 0).getTime();
+    return sortOrder === "Latest First" ? bTime - aTime : aTime - bTime;
+  });
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -496,59 +539,122 @@ export const ThreadScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
       >
-        <View style={styles.inner}>
-          <AppText variant="display" size={36} style={{ lineHeight: 38, marginBottom: 4 }}>
-            Thread<AppText size={36} color={Colors.accent}>.</AppText>
-          </AppText>
-          <AppText variant="serifItalic" size={15} color={Colors.muted} style={{ lineHeight: 22, marginBottom: 16 }}>
-            A shared record — letters, voices, photos.
-          </AppText>
+        <View style={styles.headerWrapper}>
+          {/* FLOATING RECTANGULAR CARD MATCHING MAPSCREEN & DATESSCREEN */}
+          <View style={styles.floatingHeaderCard}>
+            {/* Row 1: Header Title, Subtitle & Refresh Icon */}
+            <View style={styles.headerTopRow}>
+              <View>
+                <AppText variant="display" size={24} style={{ lineHeight: 26 }}>
+                  Thread<AppText size={24} color={Colors.accent}>.</AppText>
+                </AppText>
+                <AppText variant="serifItalic" size={12} color={Colors.muted} style={{ lineHeight: 16 }}>
+                  A shared record — letters, voices, photos.
+                </AppText>
+              </View>
 
-          {/* Compose Grid */}
-          <View style={styles.composeGrid}>
-            {COMPOSE_TYPES.map((c) => (
               <Pressable
-                key={c.k}
-                style={({ pressed }) => [
-                  styles.composeCard,
-                  pressed && { opacity: 0.85, backgroundColor: Colors.cream }
-                ]}
-                onPress={() => {
-                  if (!isAligned) {
-                    Alert.alert('Partner Required', 'Please connect with your partner first to post in Thread.');
-                    return;
-                  }
-                  setComposeType(c.k as any);
-                  setSheet(true);
-                  setTextVal('');
-                  discardPreview(); // reset voice UI
-                }}
+                style={styles.iconBtn}
+                onPress={onRefresh}
+                hitSlop={8}
               >
-                <AppText style={{ marginBottom: 4, fontSize: 20 }} color={Colors.accent}>
-                  {c.mark}
-                </AppText>
-                <AppText
-                  variant="heading"
-                  size={12}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  style={{ textAlign: 'center', width: '100%' }}
-                >
-                  {c.l}
-                </AppText>
+                <Ionicons name="refresh-outline" size={16} color={Colors.ink} />
               </Pressable>
-            ))}
-          </View>
+            </View>
 
-          {/* Filter Chips */}
-          <View style={{ marginTop: 4, marginBottom: 20 }}>
+            {/* Row 2: Quick-Compose Action Strip (Replaces bulky 6-card grid) */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 20 }}
+              contentContainerStyle={styles.composeScrollContent}
             >
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              {COMPOSE_TYPES.map((c) => (
+                <Pressable
+                  key={c.k}
+                  style={({ pressed }) => [
+                    styles.quickComposePill,
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }
+                  ]}
+                  onPress={() => {
+                    if (!isAligned) {
+                      Alert.alert('Partner Required', 'Please connect with your partner first to post in Thread.');
+                      return;
+                    }
+                    setComposeType(c.k as any);
+                    setSheet(true);
+                    setTextVal('');
+                    discardPreview(); // reset voice UI
+                  }}
+                >
+                  <AppText style={{ fontSize: 11, marginRight: 4, color: Colors.accent }}>
+                    {c.mark}
+                  </AppText>
+                  <AppText variant="smallCaps" size={10} color={Colors.ink} style={{ letterSpacing: 0.5 }}>
+                    {c.l}
+                  </AppText>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            {/* Row 3: Compact Search Box, Circular Filter Button & Circular Sort Button */}
+            <View style={styles.searchSortRow}>
+              <View style={styles.compactSearchBox}>
+                <Ionicons name="search" size={13} color={Colors.muted} style={{ marginRight: 4 }} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search letters, voices, notes..."
+                  placeholderTextColor={Colors.muted}
+                  style={styles.compactSearchInput}
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+                {searchQuery.length > 0 && (
+                  <Pressable onPress={() => setSearchQuery('')} hitSlop={6}>
+                    <Ionicons name="close-circle" size={14} color={Colors.muted} />
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Circular Filter Button */}
+              <Pressable
+                onPress={() => setShowFilterBar(prev => !prev)}
+                style={[
+                  styles.circleActionBtn,
+                  (showFilterBar || filter !== 'all') && styles.circleActionBtnActive
+                ]}
+                hitSlop={6}
+              >
+                <FilterIcon
+                  color={(showFilterBar || filter !== 'all') ? Colors.bone : Colors.ink}
+                  size={15}
+                />
+                {filter !== 'all' && <View style={styles.filterActiveDot} />}
+              </Pressable>
+
+              {/* Circular Sort Button (Cycles: Latest First <-> Oldest First) */}
+              <Pressable
+                onPress={() => {
+                  setSortOrder(prev => prev === "Latest First" ? "Oldest First" : "Latest First");
+                }}
+                style={[styles.circleActionBtn, styles.circleActionBtnActive]}
+                hitSlop={6}
+              >
+                {sortOrder === "Latest First" ? (
+                  <SortLatestIcon color={Colors.bone} size={15} />
+                ) : (
+                  <SortOldestIcon color={Colors.bone} size={15} />
+                )}
+              </Pressable>
+            </View>
+
+            {/* Row 4: Horizontal Category Filter Chips (Toggled via Filter Button) */}
+            {showFilterBar && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterScrollContent}
+              >
                 {TYPES.map((t) => {
                   const label = t === 'partner' ? partnerName : t.charAt(0).toUpperCase() + t.slice(1);
                   const isActive = filter === t;
@@ -556,37 +662,17 @@ export const ThreadScreen: React.FC = () => {
                     <Pressable
                       key={t}
                       onPress={() => setFilter(t)}
-                      style={({ pressed }) => [
-                        {
-                          paddingHorizontal: 16,
-                          paddingVertical: 8,
-                          backgroundColor: isActive ? Colors.ink : '#EFEAE1',
-                          borderRadius: 20,
-                          borderWidth: 1,
-                          borderColor: isActive ? Colors.ink : Colors.rule,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                        },
-                        pressed && { opacity: 0.8 }
+                      style={[
+                        styles.floatingFilterChip,
+                        isActive && styles.floatingFilterChipActive
                       ]}
                     >
-                      {isActive && (
-                        <View
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: Colors.accent,
-                            marginRight: 6,
-                          }}
-                        />
-                      )}
                       <AppText
                         variant="smallCaps"
                         style={{
                           color: isActive ? '#FFFFFF' : Colors.ink,
-                          fontSize: 12,
-                          letterSpacing: 0.8,
+                          fontSize: 10,
+                          letterSpacing: 0.5
                         }}
                       >
                         {label}
@@ -594,11 +680,13 @@ export const ThreadScreen: React.FC = () => {
                     </Pressable>
                   );
                 })}
-              </View>
-            </ScrollView>
+              </ScrollView>
+            )}
           </View>
+        </View>
 
-          {/* Entries */}
+        {/* Entries Feed */}
+        <View style={styles.feedContainer}>
           {filtered.map((entry) => (
             <ThreadEntryCard
               key={entry.id || entry._id || Math.random()}
@@ -833,26 +921,125 @@ export const ThreadScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bone },
-  inner: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
-
-  composeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    rowGap: 10,
+  headerWrapper: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
-  composeCard: {
-    width: '31%',
-    aspectRatio: 1.1,
-    backgroundColor: Colors.bone,
+  floatingHeaderCard: {
+    backgroundColor: 'rgba(247, 243, 236, 0.94)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.rule,
-    borderRadius: 14,
-    paddingHorizontal: 4,
-    paddingVertical: 10,
+    borderColor: 'rgba(216, 207, 196, 0.85)',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    shadowColor: Colors.ink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    gap: 8,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EAE2D4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  composeScrollContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  quickComposePill: {
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EAE2D4',
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  searchSortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  circleActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EAE2D4',
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  circleActionBtnActive: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.accent,
+  },
+  compactSearchBox: {
+    flex: 1,
+    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFE9DE',
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(216, 207, 196, 0.75)',
+  },
+  compactSearchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 13,
+    color: Colors.ink,
+    paddingVertical: 0,
+    paddingHorizontal: 4,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  filterScrollContent: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  floatingFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#EAE2D4',
+    gap: 5,
+  },
+  floatingFilterChipActive: {
+    backgroundColor: '#1C1C1E',
+  },
+  feedContainer: {
+    paddingHorizontal: 12,
+    paddingBottom: 24,
   },
 
   photoPlaceholder: {

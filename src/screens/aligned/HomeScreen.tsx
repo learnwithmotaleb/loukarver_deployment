@@ -682,6 +682,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setSheet(null)}
         kicker={`${partnerName}'s RITUALS`.toUpperCase()}
         title="What they shared with you"
+        noScroll
       >
         <View style={{ paddingVertical: 10 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>

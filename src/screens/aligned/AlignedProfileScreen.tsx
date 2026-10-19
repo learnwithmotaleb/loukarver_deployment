@@ -784,8 +784,7 @@ export const AlignedProfileScreen: React.FC = () => {
         kicker="PHOTOS"
         title="Profile Picture"
       >
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+        <View style={{ alignItems: 'center', paddingVertical: 12 }}>
             {profilePictureUrl ? (
               <Image source={{ uri: profilePictureUrl }} style={[styles.avatarLarge, { width: 100, height: 100, borderRadius: 50 }]} />
             ) : (
@@ -883,7 +882,6 @@ export const AlignedProfileScreen: React.FC = () => {
               </View>
             </View>
           )}
-        </ScrollView>
       </BottomSheet>
 
       {/* ==================== QR CODE SHEET ==================== */}

@@ -419,12 +419,17 @@ export const ThreadEntryCard: React.FC<ThreadEntryProps> = ({ entry: t, onDelete
 
 const styles = StyleSheet.create({
   cardContainer: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: Colors.bone,
     borderWidth: 1,
     borderColor: Colors.rule,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    marginBottom: 10,
+    shadowColor: Colors.ink2,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',

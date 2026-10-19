@@ -14,9 +14,11 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  runOnJS,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useKeyboardHandler } from "react-native-keyboard-controller";
 import { Colors } from "../../constants/colors";
 import { AppText } from "./AppText";
 import { AppButton } from "./AppButton";
@@ -46,6 +48,43 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const keyboardShift = useSharedValue(0);
   const [currentKeyboardHeight, setCurrentKeyboardHeight] = useState(0);
 
+  // High performance worklet keyboard tracking from react-native-keyboard-controller
+  // Works reliably inside Android Dialog windows (React Native <Modal>)
+  useKeyboardHandler(
+    {
+      onStart: (e) => {
+        "worklet";
+        if (open) {
+          keyboardShift.value = e.height;
+        }
+      },
+      onMove: (e) => {
+        "worklet";
+        if (open) {
+          keyboardShift.value = e.height;
+        }
+      },
+      onInteractive: (e) => {
+        "worklet";
+        if (open) {
+          keyboardShift.value = e.height;
+        }
+      },
+      onEnd: (e) => {
+        "worklet";
+        if (open) {
+          keyboardShift.value = e.height;
+          runOnJS(setCurrentKeyboardHeight)(e.height);
+        } else {
+          keyboardShift.value = 0;
+          runOnJS(setCurrentKeyboardHeight)(0);
+        }
+      },
+    },
+    [open],
+  );
+
+  // Fallback for environments where KeyboardController may not be attached
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
@@ -53,14 +92,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const height = e.endCoordinates.height;
       setCurrentKeyboardHeight(height);
-      const duration = e.duration && e.duration > 0 ? e.duration : 250;
-      keyboardShift.value = withTiming(height, { duration });
+      if (keyboardShift.value === 0) {
+        const duration = e.duration && e.duration > 0 ? e.duration : 250;
+        keyboardShift.value = withTiming(height, { duration });
+      }
     });
 
     const hideSub = Keyboard.addListener(hideEvent, (e) => {
       setCurrentKeyboardHeight(0);
-      const duration = e?.duration && e?.duration > 0 ? e.duration : 200;
-      keyboardShift.value = withTiming(0, { duration });
+      if (keyboardShift.value !== 0) {
+        const duration = e?.duration && e?.duration > 0 ? e.duration : 200;
+        keyboardShift.value = withTiming(0, { duration });
+      }
     });
 
     return () => {
@@ -86,9 +129,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     }
   }, [open, screenHeight]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
+  const topSafety = insets.top || 40;
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const shift = keyboardShift.value;
+    const maxH = shift > 0
+      ? Math.max(screenHeight - shift - topSafety - 10, 180)
+      : screenHeight * 0.9;
+    return {
+      transform: [{ translateY: translateY.value }],
+      maxHeight: maxH,
+    };
+  });
 
   const animatedOverlayStyle = useAnimatedStyle(() => ({
     paddingBottom: keyboardShift.value,
@@ -102,11 +154,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     Keyboard.dismiss();
     onClose();
   };
-
-  const topSafety = insets.top || 40;
-  const maxSheetHeight = currentKeyboardHeight > 0
-    ? Math.max(screenHeight - currentKeyboardHeight - topSafety - 10, 200)
-    : "90%";
 
   const bottomInset = insets.bottom || 0;
   // Detect navigation mode:
@@ -126,7 +173,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         { 
           backgroundColor: bg, 
           flexShrink: 1, 
-          maxHeight: maxSheetHeight,
         },
       ]}
     >
@@ -221,7 +267,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: "90%",
-    minHeight: 200,
+    minHeight: 140,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     overflow: "hidden",
@@ -245,6 +291,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
+    paddingTop: 16,
     paddingBottom: 40,
   },
 });

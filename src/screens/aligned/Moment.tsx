@@ -295,8 +295,7 @@ const Moment: React.FC = () => {
         kicker="IN SYNC"
         title="Watch together"
       >
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-          <AppText variant="serifItalic" size={15} color={Colors.muted} style={{ marginBottom: 24, lineHeight: 22 }}>
+        <AppText variant="serifItalic" size={15} color={Colors.muted} style={{ marginBottom: 24, lineHeight: 22 }}>
             Pick what you're watching and when. We'll ping you both at the same moment to hit play.
           </AppText>
 
@@ -470,7 +469,6 @@ const Moment: React.FC = () => {
               </AppButton>
             </>
           )}
-        </ScrollView>
       </BottomSheet>
     </View>
   );

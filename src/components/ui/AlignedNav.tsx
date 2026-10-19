@@ -8,12 +8,14 @@ import { getMyNotifications } from '../../services/notificationApi';
 import api from '../../services/api';
 import { useNavigation } from '@react-navigation/native';
 import { useModeSwitcher } from '../../hooks/useModeSwitcher';
+import { AlignedNotificationSheet } from './AlignedNotificationSheet';
 
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 const AlignedNav: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false);
   const [photoKey, setPhotoKey] = useState(Date.now());
   const navigation = useNavigation<any>();
   const { switchToVibeCheck } = useModeSwitcher();
@@ -112,10 +114,7 @@ const AlignedNav: React.FC = () => {
         {/* Notification Bell with unread badge */}
         <Pressable
           onPress={() => {
-            navigation.navigate('AlignedApp', { screen: 'Home' });
-            setTimeout(() => {
-              DeviceEventEmitter.emit('OPEN_PRESENCE_HISTORY');
-            }, 120);
+            setIsNotificationSheetOpen(true);
           }}
           hitSlop={10}
           style={styles.bellButton}
@@ -156,6 +155,12 @@ const AlignedNav: React.FC = () => {
           </Pressable>
         </View>
       </View>
+
+      <AlignedNotificationSheet
+        open={isNotificationSheetOpen}
+        onClose={() => setIsNotificationSheetOpen(false)}
+        partnerName={user?.partner?.name}
+      />
     </View>
   );
 };
