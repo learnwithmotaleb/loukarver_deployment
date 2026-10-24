@@ -181,7 +181,13 @@ export const InAppNotificationBanner: React.FC = () => {
     notification.metadata?.action === 'ping_late' ||
     notification.metadata?.action === 'upcoming_reminder';
 
-  const kickerLabel = isDate ? 'DATE ALERT' : 'PARTNER ACTIVITY';
+  const isMilestone =
+    notification.type?.toLowerCase().includes('milestone') ||
+    notification.title?.toLowerCase().includes('milestone') ||
+    notification.metadata?.screen === 'Future' ||
+    notification.metadata?.action?.includes('milestone');
+
+  const kickerLabel = isDate ? 'DATE ALERT' : isMilestone ? 'MILESTONE ALERT' : 'PARTNER ACTIVITY';
   const topOffset = insets.top + (Platform.OS === 'ios' ? 6 : 10);
 
   return (

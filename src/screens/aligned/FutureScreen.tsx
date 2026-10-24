@@ -133,6 +133,13 @@ export const FutureScreen: React.FC = () => {
       if (res && res.data) {
         const mapped = res.data.map((m: any, idx: number) => mapBackendToFrontend(m, idx));
         setMilestones(mapped);
+        setSelected((curr) => {
+          if (curr && !mapped.some((m: Milestone) => m.id === curr.id)) {
+            setSheet(null);
+            return null;
+          }
+          return curr;
+        });
       }
     } catch (e) {
       console.error(e);
@@ -164,11 +171,16 @@ export const FutureScreen: React.FC = () => {
       fetchMilestones(true);
       checkAlignment();
     });
+    const sub4 = DeviceEventEmitter.addListener('REFRESH_MILESTONES_DATA', () => {
+      fetchMilestones(true);
+      checkAlignment();
+    });
 
     return () => {
       sub1.remove();
       sub2.remove();
       sub3.remove();
+      sub4.remove();
     };
   }, [fetchMilestones]);
 
@@ -806,7 +818,7 @@ export const FutureScreen: React.FC = () => {
                     Delete this milestone?
                   </AppText>
                   <AppText variant="serifItalic" size={13} color={Colors.ink2}>
-                    This will permanently remove &ldquo;{selected.label}&rdquo; and all its progress for both of you.
+                    This will permanently remove &ldquo;{selected.label}&rdquo; and all its progress for both of you. Your partner will receive an alert and notification.
                   </AppText>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
                     <AppButton

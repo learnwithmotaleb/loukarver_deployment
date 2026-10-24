@@ -913,7 +913,7 @@ const UsSection: React.FC<UsSectionProps> = ({ refreshTrigger = 0 }) => {
       >
         <View style={{ paddingVertical: 10, gap: 14 }}>
           <AppText variant="serifItalic" size={15} color={Colors.ink2}>
-            Are you sure you want to remove &ldquo;{deleteMilestoneTarget?.title}&rdquo; from your marked dates?
+            Are you sure you want to remove &ldquo;{deleteMilestoneTarget?.title}&rdquo; from your marked dates? Your partner will receive an alert and notification.
           </AppText>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
             <AppButton

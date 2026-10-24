@@ -81,6 +81,8 @@ function useGlobalWebSocket() {
               DeviceEventEmitter.emit('REFRESH_IDEAS_DATA');
             } else if (data.type === "DATE_UPDATED" || data.type === "MILESTONE_UPDATED") {
               DeviceEventEmitter.emit('REFRESH_DATES_DATA');
+              DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
+              DeviceEventEmitter.emit('REFRESH_MILESTONES_DATA');
             } else if (typeof data.type === 'string' && data.type.startsWith("SECRET_")) {
               DeviceEventEmitter.emit('REFRESH_SECRET_DATA');
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
@@ -95,14 +97,20 @@ function useGlobalWebSocket() {
                 metadata: meta,
               });
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
+              DeviceEventEmitter.emit('REFRESH_MILESTONES_DATA');
               DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED');
               if (
                 meta.screen === 'Dates' ||
+                meta.screen === 'Future' ||
                 meta.date_id ||
+                meta.milestone_id ||
                 (notif.type && String(notif.type).toLowerCase().includes('date')) ||
+                (notif.type && String(notif.type).toLowerCase().includes('milestone')) ||
                 meta.action === 'ping_late'
               ) {
                 DeviceEventEmitter.emit('REFRESH_DATES_DATA');
+                DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
+                DeviceEventEmitter.emit('REFRESH_MILESTONES_DATA');
               }
             } else if (data.type === "STATE_UPDATE" || data.type === "PULSE_UPDATED" || data.type === "CYCLE_UPDATED") {
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
