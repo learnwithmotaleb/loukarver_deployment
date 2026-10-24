@@ -99,6 +99,8 @@ const UsSection: React.FC<UsSectionProps> = ({ refreshTrigger = 0 }) => {
   const [showMarkedCalendar, setShowMarkedCalendar] = useState(false);
   const [selectedMark, setSelectedMark] = useState<string | null>(null);
   const [markedDayTitle, setMarkedDayTitle] = useState("");
+  const [deleteMilestoneTarget, setDeleteMilestoneTarget] = useState<{ id: string; title: string } | null>(null);
+  const [isDeletingMilestone, setIsDeletingMilestone] = useState(false);
 
   // "Start Date" sheet state
   const [startDateEdit, setStartDateEdit] = useState<string>("2023-11-14");
@@ -504,29 +506,15 @@ const UsSection: React.FC<UsSectionProps> = ({ refreshTrigger = 0 }) => {
           <View style={styles.datesTab}>
             {userMilestones.length > 0 ? (
               userMilestones.map((milestone, index) => (
-                <Pressable
+                <View
                   key={milestone.id}
                   style={styles.dateRow}
-                  onLongPress={() => {
-                    Alert.alert(
-                      "Delete Date",
-                      `Remove "${milestone.title}"?`,
-                      [
-                        { text: "Cancel", style: "cancel" },
-                        {
-                          text: "Delete",
-                          style: "destructive",
-                          onPress: () => handleDeleteMilestone(milestone.id),
-                        },
-                      ]
-                    );
-                  }}
                 >
                   <View
-                    style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}
                   >
                     <AppText size={18}>{milestone.description || "◈"}</AppText>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <AppText variant="heading" size={17}>
                         {milestone.title}
                       </AppText>
@@ -535,10 +523,19 @@ const UsSection: React.FC<UsSectionProps> = ({ refreshTrigger = 0 }) => {
                       </AppText>
                     </View>
                   </View>
-                  <AppText variant="mono" color={Colors.muted}>
-                    #{String(index + 1).padStart(2, "0")}
-                  </AppText>
-                </Pressable>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    <AppText variant="mono" color={Colors.muted}>
+                      #{String(index + 1).padStart(2, "0")}
+                    </AppText>
+                    <Pressable
+                      hitSlop={10}
+                      onPress={() => setDeleteMilestoneTarget({ id: milestone.id, title: milestone.title })}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#D9534F" />
+                    </Pressable>
+                  </View>
+                </View>
               ))
             ) : (
               <View style={{ padding: 20, alignItems: "center" }}>
@@ -906,6 +903,52 @@ const UsSection: React.FC<UsSectionProps> = ({ refreshTrigger = 0 }) => {
           </AppButton>
         </View>
       </BottomSheet>
+
+      {/* Delete Marked Date Confirmation Sheet */}
+      <BottomSheet
+        open={!!deleteMilestoneTarget}
+        onClose={() => setDeleteMilestoneTarget(null)}
+        kicker="DELETE DATE"
+        title="Remove marked date"
+      >
+        <View style={{ paddingVertical: 10, gap: 14 }}>
+          <AppText variant="serifItalic" size={15} color={Colors.ink2}>
+            Are you sure you want to remove &ldquo;{deleteMilestoneTarget?.title}&rdquo; from your marked dates?
+          </AppText>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+            <AppButton
+              variant="outline"
+              size="md"
+              style={{ flex: 1 }}
+              onPress={() => setDeleteMilestoneTarget(null)}
+              disabled={isDeletingMilestone}
+            >
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="solid"
+              size="md"
+              style={{ flex: 1, backgroundColor: '#D9534F' }}
+              textStyle={{ color: '#FFF' }}
+              disabled={isDeletingMilestone}
+              onPress={async () => {
+                if (!deleteMilestoneTarget) return;
+                setIsDeletingMilestone(true);
+                try {
+                  await handleDeleteMilestone(deleteMilestoneTarget.id);
+                  setDeleteMilestoneTarget(null);
+                } catch (e) {
+                  console.log("Error deleting milestone:", e);
+                } finally {
+                  setIsDeletingMilestone(false);
+                }
+              }}
+            >
+              {isDeletingMilestone ? "Removing..." : "Delete Date"}
+            </AppButton>
+          </View>
+        </View>
+      </BottomSheet>
     </View>
   );
 };
@@ -996,6 +1039,7 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: Colors.rule,

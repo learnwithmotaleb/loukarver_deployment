@@ -107,7 +107,7 @@ export const getFastPartnerPicture = async (context = 'aligned', partnerId = nul
 };
 
 
-export const uploadProfilePhoto = async (imageUri) => {
+export const uploadProfilePhoto = async (imageUri, cropData = null) => {
   const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
   const token = await AsyncStorage.getItem('access_token');
 
@@ -128,6 +128,14 @@ export const uploadProfilePhoto = async (imageUri) => {
       name: filename,
       type: type,
     });
+  }
+
+  if (cropData) {
+    if (cropData.originX !== undefined) formData.append('crop_x', String(cropData.originX));
+    if (cropData.originY !== undefined) formData.append('crop_y', String(cropData.originY));
+    if (cropData.width !== undefined) formData.append('crop_width', String(cropData.width));
+    if (cropData.height !== undefined) formData.append('crop_height', String(cropData.height));
+    if (cropData.rotate !== undefined) formData.append('rotate', String(cropData.rotate));
   }
 
   let baseUrl = api.defaults.baseURL || '';

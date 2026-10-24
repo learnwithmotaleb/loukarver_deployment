@@ -36,8 +36,15 @@ const Login = () => {
       if (token) {
         try {
           const { getMe } = require('../services/authApi');
-          await getMe();
-          navigation.navigate('ModeSelector', { autoSelect: route.params?.returnTo });
+          const user = await getMe();
+          if (user?.is_aligned || user?.partner) {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'AlignedApp' }],
+            });
+          } else {
+            navigation.navigate('ModeSelector', { autoSelect: route.params?.returnTo });
+          }
         } catch (e) {
           console.log("Auto-login failed:", e);
         }
@@ -58,9 +65,10 @@ const Login = () => {
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
 
+      let user: any = null;
       try {
         const { getMe } = require('../services/authApi');
-        const user = await getMe();
+        user = await getMe();
         
         const Constants = require('expo-constants').default;
         const ExecutionEnvironment = require('expo-constants').ExecutionEnvironment;
@@ -71,11 +79,18 @@ const Login = () => {
           OneSignal.login(user.id);
         }
       } catch (e) {
-        console.log("Failed to login to OneSignal", e);
+        console.log("Failed to login to OneSignal / fetch user:", e);
       }
 
       const returnTo = route.params?.returnTo;
-      navigation.navigate('ModeSelector', { autoSelect: returnTo });
+      if (user?.is_aligned || user?.partner) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'AlignedApp' }],
+        });
+      } else {
+        navigation.navigate('ModeSelector', { autoSelect: returnTo });
+      }
     } catch (error: any) {
       let errorMessage = error.response?.data?.detail || error.message || 'An error occurred during login.';
       if (errorMessage.toLowerCase() === 'network error') {

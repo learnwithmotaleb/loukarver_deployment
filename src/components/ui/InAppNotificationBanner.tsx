@@ -7,6 +7,7 @@ import {
   PanResponder,
   DeviceEventEmitter,
   Platform,
+  Vibration,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ export const InAppNotificationBanner: React.FC = () => {
   const translateY = useRef(new Animated.Value(-160)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastNotifRef = useRef<{ key: string; time: number } | null>(null);
 
   const clearTimer = () => {
     if (hideTimerRef.current) {
@@ -59,12 +61,26 @@ export const InAppNotificationBanner: React.FC = () => {
   };
 
   const showBanner = (payload: InAppNotificationPayload) => {
+    // Deduplication check: prevent duplicate popups/buzzes within 2 seconds
+    const notifKey = payload.id || `${payload.title}_${payload.message || ''}`;
+    const now = Date.now();
+    if (lastNotifRef.current && lastNotifRef.current.key === notifKey && now - lastNotifRef.current.time < 2000) {
+      return;
+    }
+    lastNotifRef.current = { key: notifKey, time: now };
+
     clearTimer();
     setNotification(payload);
 
     try {
+      if (Platform.OS !== 'web') {
+        // Distinct double-buzz pattern ([0, 250, 150, 250]ms) for noticeable physical sensation
+        Vibration.vibrate([0, 250, 150, 250]);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch {}
+    } catch (e) {
+      console.log('Notification vibration error:', e);
+    }
 
     translateY.setValue(-160);
     opacity.setValue(0);
@@ -140,11 +156,13 @@ export const InAppNotificationBanner: React.FC = () => {
 
   if (!notification) return null;
 
-  const getIconName = (type?: string): keyof typeof Ionicons.glyphMap => {
+  const getIconName = (type?: string, metadata?: any): keyof typeof Ionicons.glyphMap => {
+    if (metadata?.action === 'ping_late') return 'alarm-outline';
     if (!type) return 'notifications-outline';
     const lower = type.toLowerCase();
-    if (lower.includes('mood')) return 'heart-circle-outline';
     if (lower.includes('date') || lower.includes('proposal')) return 'calendar-outline';
+    if (lower.includes('late') || lower.includes('running late')) return 'alarm-outline';
+    if (lower.includes('mood')) return 'heart-circle-outline';
     if (lower.includes('milestone')) return 'ribbon-outline';
     if (lower.includes('thread') || lower.includes('message')) return 'chatbubble-ellipses-outline';
     if (lower.includes('confidential') || lower.includes('secret')) return 'lock-closed-outline';
@@ -155,6 +173,15 @@ export const InAppNotificationBanner: React.FC = () => {
     return 'notifications-outline';
   };
 
+  const isDate =
+    notification.type?.toLowerCase().includes('date') ||
+    notification.title?.toLowerCase().includes('date') ||
+    notification.metadata?.screen === 'Dates' ||
+    notification.metadata?.action?.includes('date') ||
+    notification.metadata?.action === 'ping_late' ||
+    notification.metadata?.action === 'upcoming_reminder';
+
+  const kickerLabel = isDate ? 'DATE ALERT' : 'PARTNER ACTIVITY';
   const topOffset = insets.top + (Platform.OS === 'ios' ? 6 : 10);
 
   return (
@@ -175,7 +202,7 @@ export const InAppNotificationBanner: React.FC = () => {
           <View style={styles.kickerGroup}>
             <View style={styles.accentDot} />
             <AppText variant="mono" size={10} color={Colors.accent} style={styles.kickerText}>
-              PARTNER ACTIVITY
+              {kickerLabel}
             </AppText>
             <AppText variant="mono" size={10} color={Colors.muted}>
               · Just now
@@ -189,7 +216,7 @@ export const InAppNotificationBanner: React.FC = () => {
         {/* Content Row */}
         <View style={styles.contentRow}>
           <View style={styles.iconCircle}>
-            <Ionicons name={getIconName(notification.type)} size={18} color={Colors.accent} />
+            <Ionicons name={getIconName(notification.type, notification.metadata)} size={18} color={Colors.accent} />
           </View>
 
           <View style={styles.textColumn}>

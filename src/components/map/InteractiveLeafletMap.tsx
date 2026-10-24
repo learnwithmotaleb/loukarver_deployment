@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Colors } from '../../constants/colors';
@@ -16,6 +16,7 @@ interface InteractiveLeafletMapProps {
   routes?: any[];
   selectedPin?: UIMapPin | null;
   onSelectPin?: (pin: UIMapPin) => void;
+  onMapClicked?: () => void;
   onMapLongPress?: (coords: { lat: number; lng: number }) => void;
   clearTempPinTrigger?: number;
   activeFilter?: string;
@@ -38,6 +39,7 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
   routes = [],
   selectedPin,
   onSelectPin,
+  onMapClicked,
   onMapLongPress,
   clearTempPinTrigger,
   activeFilter = 'all',
@@ -48,29 +50,11 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
   resetCompassTrigger,
 }) => {
   const webViewRef = useRef<WebView>(null);
+  const isMapReadyRef = useRef<boolean>(false);
   const maptilerApiKey = process.env.EXPO_PUBLIC_MAPTILER_API_KEY || '';
 
-  // Find center coordinates from selected pin or home pin or average
-  const initialCenter = useMemo(() => {
-    if (selectedPin && selectedPin.lat && selectedPin.lng) {
-      return { lat: selectedPin.lat, lng: selectedPin.lng, zoom: 5 };
-    }
-    const validPlaces = places.filter(p => p.lat != null && p.lng != null && (p.lat !== 0 || p.lng !== 0));
-    if (validPlaces.length > 0) {
-      const homePin = validPlaces.find(p => p.type === 'home');
-      if (homePin) return { lat: homePin.lat, lng: homePin.lng, zoom: 4 };
-      return { lat: validPlaces[0].lat, lng: validPlaces[0].lng, zoom: 4 };
-    }
-    // Default world center
-    return { lat: 25.0, lng: 15.0, zoom: 2 };
-  }, []);
-
-  // HTML + Leaflet CSS/JS bundle template
+  // Stable HTML bundle: memoized ONLY by API key so WebView NEVER unmounts/reloads on data updates
   const mapHtml = useMemo(() => {
-    const validPlaces = places.filter(p => p.lat != null && p.lng != null && (p.lat !== 0 || p.lng !== 0));
-    const serializedPlaces = JSON.stringify(validPlaces);
-    const serializedSelectedId = JSON.stringify(selectedPin?.id || null);
-
     return `
 <!DOCTYPE html>
 <html>
@@ -119,9 +103,9 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       100% { transform: scale(1.4); opacity: 0; }
     }
     .pin-selected .pin-core {
-      transform: scale(1.25);
+      transform: scale(1.35);
       border-width: 4px;
-      box-shadow: 0 6px 14px rgba(192, 86, 64, 0.45);
+      box-shadow: 0 8px 18px rgba(192, 86, 64, 0.5);
     }
 
     /* Trajectory curve styling */
@@ -171,7 +155,7 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
 
     /* Minimalist Map Controls */
     .leaflet-bottom.leaflet-left {
-      bottom: 80px !important;
+      bottom: 96px !important;
       left: 16px !important;
     }
     .leaflet-bottom.leaflet-right {
@@ -204,19 +188,19 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
   <div id="map"></div>
 
   <script>
-    const placesData = ${serializedPlaces};
-    const routesData = ${JSON.stringify(routes)};
-    let selectedId = ${serializedSelectedId};
-    let currentFilter = "${activeFilter}";
+    let placesData = [];
+    let routesData = [];
+    let selectedId = null;
+    let currentFilter = "all";
     const pinColors = ${JSON.stringify(PIN_COLORS)};
     const apiKey = "${maptilerApiKey}";
 
     // 1. Initialize Map
     const map = L.map('map', {
-      center: [${initialCenter.lat}, ${initialCenter.lng}],
-      zoom: ${initialCenter.zoom},
+      center: [25.0, 15.0],
+      zoom: 2,
       minZoom: 2,
-      maxZoom: 17,
+      maxZoom: 18,
       zoomControl: false,
       attributionControl: true
     });
@@ -224,9 +208,9 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
 
     setTimeout(function() {
       map.invalidateSize();
-    }, 250);
+    }, 200);
 
-    // 2. MapTiler Pastel Luxury Tile Layer (With Fallback)
+    // 2. MapTiler Pastel Luxury Tile Layer (With Guaranteed Non-Looping Fallback)
     const maptilerUrl = 'https://api.maptiler.com/maps/pastel/256/{z}/{x}/{y}.png?key=' + apiKey;
     const fallbackUrl = 'https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png';
 
@@ -235,8 +219,10 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> &copy; OpenStreetMap'
     }).addTo(map);
 
+    let hasSwitchedToFallback = false;
     tileLayer.on('tileerror', function() {
-      if (tileLayer._url !== fallbackUrl) {
+      if (!hasSwitchedToFallback && tileLayer._url !== fallbackUrl) {
+        hasSwitchedToFallback = true;
         tileLayer.setUrl(fallbackUrl);
       }
     });
@@ -268,7 +254,6 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       const dLat = lat2 - lat1;
       let dLng = lng2 - lng1;
 
-      // Handle antimeridian wrapping
       if (dLng > 180) dLng -= 360;
       if (dLng < -180) dLng += 360;
 
@@ -278,11 +263,9 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       const midLat = (lat1 + lat2) / 2;
       const midLng = (lng1 + lng2) / 2;
 
-      // Perpendicular normal in geographic plane (X=lng, Y=lat)
       let perpLng = -dLat / dist;
       let perpLat = dLng / dist;
 
-      // Arc towards the pole (North in northern hemisphere)
       if (midLat >= 0) {
         if (perpLat < 0) {
           perpLat = -perpLat;
@@ -295,12 +278,10 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
         }
       }
 
-      // If nearly pure North-South flight, gently bow eastward
       if (Math.abs(perpLat) < 0.15) {
         perpLng = 0.7;
       }
 
-      // Subtle, elegant arch
       const curvature = Math.min(dist * 0.15, 8);
       const controlLat = midLat + perpLat * curvature;
       const controlLng = midLng + perpLng * curvature;
@@ -333,10 +314,13 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
           zIndexOffset: isSelected ? 1000 : 0
         });
 
-        marker.on('click', () => {
+        marker.on('click', function(e) {
+          if (e && e.originalEvent) {
+            L.DomEvent.stopPropagation(e);
+          }
           selectedId = place.id;
           renderPinsAndArcs();
-          map.flyTo([place.lat, place.lng], Math.max(map.getZoom(), 5), { duration: 0.8 });
+          window.centerOnPinWithOffset(place.lat, place.lng);
           if (window.ReactNativeWebView) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'PIN_SELECTED',
@@ -349,7 +333,7 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
         markerMap[place.id] = marker;
       });
 
-      // 1. Draw Journey Routes if available
+      // 1. Draw Journey Routes
       let hasRouteArcs = false;
       if (routesData && routesData.length > 0) {
         routesData.forEach(route => {
@@ -371,7 +355,7 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
         });
       }
 
-      // 2. Draw arcs from homePin to destinations if no routes were drawn
+      // 2. Draw arcs from homePin to destinations if no custom routes
       if (!hasRouteArcs && homePin) {
         placesData.forEach(place => {
           if (place.lat == null || place.lng == null || (place.lat === 0 && place.lng === 0)) return;
@@ -388,7 +372,96 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       }
     }
 
-    renderPinsAndArcs();
+    // Dynamic Pin Center with Vertical Offset (positions pin above bottom peek card)
+    window.centerOnPinWithOffset = function(lat, lng, targetZoom) {
+      if (lat == null || lng == null || (lat === 0 && lng === 0)) return;
+      const zoom = targetZoom || Math.max(map.getZoom(), 7);
+      // Project to pixel space and offset camera southwards by 105px so the marker sits in the upper visible area
+      const targetPoint = map.project([lat, lng], zoom).add([0, 105]);
+      const targetLatLng = map.unproject(targetPoint, zoom);
+      map.flyTo(targetLatLng, zoom, { duration: 0.9, easeLinearity: 0.25 });
+    };
+
+    // Auto-Fit All Pins At Once on screen with comfortable padding
+    window.fitAllPins = function() {
+      const validPins = placesData.filter(function(p) {
+        if (p.lat == null || p.lng == null || (p.lat === 0 && p.lng === 0)) return false;
+        if (currentFilter !== 'all' && p.type !== currentFilter) return false;
+        return true;
+      });
+
+      if (validPins.length > 1) {
+        const bounds = L.latLngBounds(validPins.map(function(p) { return [p.lat, p.lng]; }));
+        map.fitBounds(bounds, {
+          paddingTopLeft: [50, 120],
+          paddingBottomRight: [50, 100],
+          maxZoom: 13,
+          animate: true,
+          duration: 0.9
+        });
+      } else if (validPins.length === 1) {
+        window.centerOnPinWithOffset(validPins[0].lat, validPins[0].lng, 8);
+      } else {
+        map.flyTo([25.0, 15.0], 2, { duration: 0.8 });
+      }
+    };
+
+    // Incremental Data Updater: NEVER reloads the WebView!
+    window.updatePlacesData = function(newPlaces, newRoutes, newSelId, newFilter, autoFit) {
+      placesData = newPlaces || [];
+      routesData = newRoutes || [];
+      if (newSelId !== undefined) selectedId = newSelId;
+      if (newFilter !== undefined) currentFilter = newFilter;
+      renderPinsAndArcs();
+      if (autoFit) {
+        window.fitAllPins();
+      }
+    };
+
+    window.updateSelectedPin = function(pinId, lat, lng) {
+      selectedId = pinId;
+      renderPinsAndArcs();
+      window.centerOnPinWithOffset(lat, lng);
+    };
+
+    window.clearSelectedPin = function() {
+      selectedId = null;
+      renderPinsAndArcs();
+    };
+
+    window.flyToLocation = function(lat, lng, zoom) {
+      if (window.searchMarker) {
+        map.removeLayer(window.searchMarker);
+      }
+      window.centerOnPinWithOffset(lat, lng, zoom || 10);
+      const pulseIcon = L.divIcon({
+        className: 'search-target-pin',
+        html: '<div class="pin-marker pin-selected"><div class="pin-pulse" style="background: rgba(192, 86, 64, 0.45);"></div><div class="pin-core" style="border-color: #C05640; color: #C05640; font-size: 13px;">📍</div></div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+      window.searchMarker = L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+    };
+
+    window.showUserLiveLocation = function(lat, lng) {
+      if (window.userLocationMarker) {
+        map.removeLayer(window.userLocationMarker);
+      }
+      window.centerOnPinWithOffset(lat, lng, 14);
+      const liveIcon = L.divIcon({
+        className: 'user-live-location-pin',
+        html: '<div class="live-location-wrap"><div class="live-location-pulse"></div><div class="live-location-dot"></div></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+      window.userLocationMarker = L.marker([lat, lng], { icon: liveIcon, zIndexOffset: 2000 }).addTo(map);
+    };
+
+    window.updateFilter = function(filter) {
+      currentFilter = filter;
+      renderPinsAndArcs();
+      window.fitAllPins();
+    };
 
     let longPressTimer = null;
     let touchStartPoint = null;
@@ -405,7 +478,6 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       clearLongPress();
       didTriggerLongPress = true;
 
-      // Drop a temporary pulse marker at the clicked location
       if (window.tempDropPin) {
         map.removeLayer(window.tempDropPin);
       }
@@ -473,6 +545,10 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
         didTriggerLongPress = false;
         return;
       }
+      if (selectedId) {
+        selectedId = null;
+        renderPinsAndArcs();
+      }
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'MAP_CLICKED',
@@ -482,100 +558,86 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
       }
     });
 
-    window.updateSelectedPin = function(pinId, lat, lng) {
-      selectedId = pinId;
-      renderPinsAndArcs();
-      if (lat != null && lng != null && (lat !== 0 || lng !== 0)) {
-        map.flyTo([lat, lng], Math.max(map.getZoom(), 6), { duration: 0.9 });
-      }
-    };
-
-    window.flyToLocation = function(lat, lng, zoom) {
-      if (window.searchMarker) {
-        map.removeLayer(window.searchMarker);
-      }
-      map.flyTo([lat, lng], zoom || 10, { duration: 1.1 });
-      const pulseIcon = L.divIcon({
-        className: 'search-target-pin',
-        html: '<div class="pin-marker pin-selected"><div class="pin-pulse" style="background: rgba(192, 86, 64, 0.45);"></div><div class="pin-core" style="border-color: #C05640; color: #C05640; font-size: 13px;">📍</div></div>',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
-      });
-      window.searchMarker = L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
-    };
-
-    window.showUserLiveLocation = function(lat, lng) {
-      if (window.userLocationMarker) {
-        map.removeLayer(window.userLocationMarker);
-      }
-      map.flyTo([lat, lng], 14, { duration: 1.2 });
-      const liveIcon = L.divIcon({
-        className: 'user-live-location-pin',
-        html: '<div class="live-location-wrap"><div class="live-location-pulse"></div><div class="live-location-dot"></div></div>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-      });
-      window.userLocationMarker = L.marker([lat, lng], { icon: liveIcon, zIndexOffset: 2000 }).addTo(map);
-    };
-
-    window.resetCompassView = function() {
-      const validPins = placesData.filter(p => p.lat != null && p.lng != null && (p.lat !== 0 || p.lng !== 0));
-      if (validPins.length > 1) {
-        const bounds = L.latLngBounds(validPins.map(p => [p.lat, p.lng]));
-        map.flyToBounds(bounds, { padding: [60, 60], duration: 1.1 });
-      } else if (validPins.length === 1) {
-        map.flyTo([validPins[0].lat, validPins[0].lng], 5, { duration: 1.0 });
-      } else {
-        map.flyTo([25.0, 15.0], 2, { duration: 1.0 });
-      }
-    };
-
-    window.updateFilter = function(filter) {
-      currentFilter = filter;
-      renderPinsAndArcs();
-    };
+    // Notify React Native that Map Engine is fully initialized
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+    }
   </script>
 </body>
 </html>
     `;
-  }, [places, routes, maptilerApiKey]);
+  }, [maptilerApiKey]);
 
+  const syncPlacesToMap = useCallback((autoFit: boolean = false) => {
+    if (!isMapReadyRef.current) return;
+    const validPlaces = places.filter(p => p.lat != null && p.lng != null && (p.lat !== 0 || p.lng !== 0));
+    const code = `if (window.updatePlacesData) {
+      window.updatePlacesData(
+        ${JSON.stringify(validPlaces)},
+        ${JSON.stringify(routes)},
+        ${JSON.stringify(selectedPin?.id || null)},
+        ${JSON.stringify(activeFilter)},
+        ${autoFit ? 'true' : 'false'}
+      );
+    }`;
+    webViewRef.current?.injectJavaScript(code);
+  }, [places, routes, selectedPin?.id, activeFilter]);
+
+  // Push place updates to map dynamically without tearing down WebView
   useEffect(() => {
-    if (selectedPin && selectedPin.lat != null && selectedPin.lng != null) {
-      const code = `if (window.updateSelectedPin) { window.updateSelectedPin(${JSON.stringify(selectedPin.id)}, ${selectedPin.lat}, ${selectedPin.lng}); }`;
+    if (isMapReadyRef.current) {
+      syncPlacesToMap(false);
+    }
+  }, [places, routes, syncPlacesToMap]);
+
+  // Handle Filter switch with auto-fit bounds
+  useEffect(() => {
+    if (isMapReadyRef.current) {
+      const code = `if (window.updateFilter) { window.updateFilter(${JSON.stringify(activeFilter)}); }`;
       webViewRef.current?.injectJavaScript(code);
+    }
+  }, [activeFilter]);
+
+  // Handle selected pin updates (smooth offset glide)
+  useEffect(() => {
+    if (isMapReadyRef.current) {
+      if (selectedPin && selectedPin.lat != null && selectedPin.lng != null) {
+        const code = `if (window.updateSelectedPin) { window.updateSelectedPin(${JSON.stringify(selectedPin.id)}, ${selectedPin.lat}, ${selectedPin.lng}); }`;
+        webViewRef.current?.injectJavaScript(code);
+      } else if (!selectedPin) {
+        webViewRef.current?.injectJavaScript(`if (window.clearSelectedPin) { window.clearSelectedPin(); }`);
+      }
     }
   }, [selectedPin]);
 
+  // Handle focused geocoded search location
   useEffect(() => {
-    if (focusLocation && focusLocation.lat != null && focusLocation.lng != null) {
+    if (focusLocation && focusLocation.lat != null && focusLocation.lng != null && isMapReadyRef.current) {
       const zoom = focusLocation.zoom || 10;
       const code = `if (window.flyToLocation) { window.flyToLocation(${focusLocation.lat}, ${focusLocation.lng}, ${zoom}); }`;
       webViewRef.current?.injectJavaScript(code);
     }
   }, [focusLocation]);
 
+  // Handle user live GPS location
   useEffect(() => {
-    if (userLocation && userLocation.lat != null && userLocation.lng != null) {
+    if (userLocation && userLocation.lat != null && userLocation.lng != null && isMapReadyRef.current) {
       const code = `if (window.showUserLiveLocation) { window.showUserLiveLocation(${userLocation.lat}, ${userLocation.lng}); }`;
       webViewRef.current?.injectJavaScript(code);
     }
   }, [userLocation]);
 
+  // Handle Compass / Fit All Pins trigger
   useEffect(() => {
-    if (resetCompassTrigger) {
-      const code = `if (window.resetCompassView) { window.resetCompassView(); }`;
+    if (resetCompassTrigger && isMapReadyRef.current) {
+      const code = `if (window.fitAllPins) { window.fitAllPins(); }`;
       webViewRef.current?.injectJavaScript(code);
     }
   }, [resetCompassTrigger]);
 
+  // Handle Temp Pin clearance
   useEffect(() => {
-    const code = `if (window.updateFilter) { window.updateFilter(${JSON.stringify(activeFilter)}); }`;
-    webViewRef.current?.injectJavaScript(code);
-  }, [activeFilter]);
-
-  useEffect(() => {
-    if (clearTempPinTrigger) {
+    if (clearTempPinTrigger && isMapReadyRef.current) {
       webViewRef.current?.injectJavaScript(`if (window.clearTempDropPin) { window.clearTempDropPin(); }`);
     }
   }, [clearTempPinTrigger]);
@@ -583,11 +645,16 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'PIN_SELECTED' && onSelectPin) {
+      if (data.type === 'MAP_READY') {
+        isMapReadyRef.current = true;
+        syncPlacesToMap(true);
+      } else if (data.type === 'PIN_SELECTED' && onSelectPin) {
         const found = places.find(p => p.id === data.placeId);
         if (found) {
           onSelectPin(found);
         }
+      } else if (data.type === 'MAP_CLICKED') {
+        onMapClicked?.();
       } else if (data.type === 'MAP_LONG_PRESS' && onMapLongPress) {
         onMapLongPress({ lat: data.lat, lng: data.lng });
       }
@@ -610,6 +677,14 @@ export const InteractiveLeafletMap: React.FC<InteractiveLeafletMapProps> = ({
         overScrollMode="never"
         bounces={false}
         onMessage={handleMessage}
+        onLoadEnd={() => {
+          setTimeout(() => {
+            if (!isMapReadyRef.current) {
+              isMapReadyRef.current = true;
+              syncPlacesToMap(true);
+            }
+          }, 150);
+        }}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={Colors.accent} />
@@ -648,7 +723,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#F7F3EC',
-    overflow: 'hidden',
   },
   webView: {
     flex: 1,
@@ -661,14 +735,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F3EC',
   },
   legendBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: '#F7F3EC',
-    borderTopWidth: 1,
-    borderTopColor: Colors.rule,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8E1D5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
   },
   legendItem: {
     flexDirection: 'row',
@@ -682,7 +766,8 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 9,
-    color: Colors.muted,
+    color: '#6B5E55',
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
 });

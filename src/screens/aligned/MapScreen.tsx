@@ -15,7 +15,7 @@ import AlignedNav from "@/components/ui/AlignedNav";
 import { DeviceEventEmitter } from "react-native";
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimePickerModal } from "../../components/ui/AppDateTimePickerModal";
 import { getMapOverview, createPlace, updatePlace, deletePlace, requestDeletePlace, approveDeletePlace, rejectDeletePlace, addMoment } from "../../services/mapApi";
 import { triggerNotification } from "../../services/notificationApi";
 import { getUserProfile } from "../../services/userApi";
@@ -137,6 +137,7 @@ export const MapScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [confirmDeletePlace, setConfirmDeletePlace] = useState(false);
 
   // New place inputs
   const [newCity, setNewCity] = useState("");
@@ -221,8 +222,13 @@ export const MapScreen: React.FC = () => {
     const sub1 = DeviceEventEmitter.addListener('REFRESH_MAP_DATA', () => {
       loadMapData(false);
     });
+    let lastRefreshTime = 0;
     const sub2 = DeviceEventEmitter.addListener('REFRESH_ALIGNED_DATA', () => {
-      loadMapData(false);
+      const now = Date.now();
+      if (now - lastRefreshTime > 10000) {
+        lastRefreshTime = now;
+        loadMapData(false);
+      }
     });
     return () => {
       sub1.remove();
@@ -333,7 +339,7 @@ export const MapScreen: React.FC = () => {
 
     if (item.isSaved && item.savedPin) {
       setSelected(item.savedPin);
-      setSheet("detail");
+      setSheet(null);
       setSearchedLocation(null);
     } else {
       setSearchedLocation({
@@ -454,16 +460,16 @@ export const MapScreen: React.FC = () => {
       let detectedCountry = "";
 
       // 1. Primary: MapTiler Reverse Geocoding
-      if (maptilerApiKey) {
+      if (maptilerApiKey && lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
         try {
           const res = await axios.get(
             `https://api.maptiler.com/geocoding/${lng},${lat}.json`,
-            { params: { key: maptilerApiKey, limit: 5 }, timeout: 4000 }
+            { params: { key: maptilerApiKey }, timeout: 4000 }
           );
           const features = res.data?.features || [];
           if (features.length > 0) {
             const cityFeature = features.find((f: any) =>
-              f.place_type?.some((t: string) => ['municipality', 'place', 'locality', 'subregion', 'city', 'town'].includes(t))
+              f.place_type?.some((t: string) => ['municipality', 'joint_municipality', 'place', 'locality', 'subregion', 'city', 'town'].includes(t))
             ) || features[0];
 
             detectedCity = cityFeature.text || cityFeature.place_name?.split(',')[0] || '';
@@ -630,83 +636,53 @@ export const MapScreen: React.FC = () => {
     }
   };
 
-  const handleDeletePlace = async (placeId: string) => {
-    if (!selected) return;
-
-    let uid = currentUserId;
-    if (!uid) {
-      try {
-        const profile = await getUserProfile();
-        if (profile?.data) {
-          uid = profile.data.id || profile.data._id || "";
-          setCurrentUserId(uid);
-        }
-      } catch (e) {}
+  const handleExecuteDeletePlace = async (placeId: string) => {
+    setIsDeleting(true);
+    try {
+      await deletePlace(placeId);
+      triggerNotification("Map Delete", `Removed ${selected?.city || 'place'} from the map`).catch(() => {});
+      setConfirmDeletePlace(false);
+      setSheet(null);
+      setSelected(null);
+      loadMapData(false);
+    } catch (err: any) {
+      console.error("Error deleting place:", err);
+      CustomAlert.alert("Error", err?.response?.data?.detail || "Failed to delete place.");
+    } finally {
+      setIsDeleting(false);
     }
+  };
 
-    // Check if partner has contributed any memories (creator_id !== uid)
-    const hasPartnerContribution = selected.moments && selected.moments.some(
-      (m: any) => m.creator_id && uid && m.creator_id !== uid
-    );
+  const handleExecuteRequestDelete = async (placeId: string) => {
+    setIsDeleting(true);
+    try {
+      await requestDeletePlace(placeId);
+      setConfirmDeletePlace(false);
+      setSheet(null);
+      loadMapData(false);
+      CustomAlert.alert(
+        "Request Sent",
+        "An approval request has been sent to your partner. You will be notified once they confirm."
+      );
+    } catch (err: any) {
+      console.error("Error requesting deletion:", err);
+      CustomAlert.alert("Error", err?.response?.data?.detail || "Failed to send request.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-    if (hasPartnerContribution) {
-      CustomAlert.alert(
-        "Removal Approval Needed",
-        "Your partner has contributed memories to this place. Removing it requires their confirmation. Send an approval request?",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Send Request",
-            onPress: async () => {
-              setIsDeleting(true);
-              try {
-                await requestDeletePlace(placeId);
-                CustomAlert.alert(
-                  "Request Sent",
-                  "An approval request has been sent to your partner. You will be notified once they confirm.",
-                  [{ text: "OK" }]
-                );
-                setSheet(null);
-                loadMapData(false);
-              } catch (err: any) {
-                console.error("Error requesting deletion:", err);
-                CustomAlert.alert("Error", "Failed to send request.");
-              } finally {
-                setIsDeleting(false);
-              }
-            }
-          }
-        ]
-      );
-    } else {
-      // Direct Instant Delete for Mistakes / Solo creations
-      CustomAlert.alert(
-        "Remove Place",
-        `Are you sure you want to remove ${selected.city} from your map?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Remove",
-            style: "destructive",
-            onPress: async () => {
-              setIsDeleting(true);
-              try {
-                await deletePlace(placeId);
-                triggerNotification("Map Delete", `Removed ${selected.city} from the map`).catch(() => {});
-                setSheet(null);
-                setSelected(null);
-                loadMapData(false);
-                CustomAlert.alert("Removed", `${selected.city} was removed from your map.`);
-              } catch (err: any) {
-                console.error("Error deleting place:", err);
-                CustomAlert.alert("Error", "Failed to delete place.");
-              } finally {
-                setIsDeleting(false);
-              }
-            }
-          }
-        ]
-      );
+  const handleCancelDeleteRequest = async (placeId: string) => {
+    setIsDeleting(true);
+    try {
+      await rejectDeletePlace(placeId);
+      setSheet(null);
+      loadMapData(false);
+    } catch (err: any) {
+      console.error("Error cancelling deletion request:", err);
+      CustomAlert.alert("Error", "Failed to cancel deletion request.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -853,7 +829,9 @@ export const MapScreen: React.FC = () => {
             selectedPin={selected}
             onSelectPin={(pin) => {
               setSelected(pin);
-              setSheet("detail");
+            }}
+            onMapClicked={() => {
+              setSelected(null);
             }}
             onMapLongPress={handleMapLongPress}
             clearTempPinTrigger={clearTempPinTrigger}
@@ -1100,8 +1078,27 @@ export const MapScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Classy Floating Map Controls: Live Location */}
-          <View style={styles.floatingRightToolStack} pointerEvents="box-none">
+          {/* Classy Floating Map Controls: Fit All Pins & Live Location */}
+          <View
+            style={[
+              styles.floatingRightToolStack,
+              selected && !sheet ? { bottom: 185 } : null,
+            ]}
+            pointerEvents="box-none"
+          >
+            {/* Fit All Pins Button */}
+            <Pressable
+              style={styles.floatingCircleBtn}
+              onPress={handleResetCompass}
+              hitSlop={6}
+            >
+              <Ionicons
+                name="scan-outline"
+                size={20}
+                color={Colors.ink}
+              />
+            </Pressable>
+
             {/* Live Location Button */}
             <Pressable
               style={[styles.floatingCircleBtn, isLocating && styles.floatingCircleBtnActive]}
@@ -1120,30 +1117,100 @@ export const MapScreen: React.FC = () => {
             </Pressable>
           </View>
 
-          {/* FLOATING BOTTOM CONTROLS */}
-          <View style={styles.floatingBottomControls} pointerEvents="box-none">
-            {/* Places List Toggle Button */}
-            <Pressable
-              style={styles.floatingPlacesListBtn}
-              onPress={() => setSheet("placesList")}
-            >
-              <Ionicons name="list" size={16} color={Colors.ink} />
-              <AppText variant="smallCaps" size={11} color={Colors.ink} style={{ fontWeight: '600', marginLeft: 4 }}>
-                Places ({filtered.length})
-              </AppText>
-            </Pressable>
+          {/* SELECTED PIN PEEK CARD (Keeps marker unobstructed on the map) */}
+          {selected && !sheet ? (
+            <View style={styles.peekCardWrapper} pointerEvents="box-none">
+              <Pressable
+                style={styles.peekCard}
+                onPress={() => setSheet("detail")}
+              >
+                {/* Header Row */}
+                <View style={styles.peekHeaderRow}>
+                  <View style={styles.peekTagGroup}>
+                    <View style={[styles.peekDot, { backgroundColor: PIN_COLORS[selected.type] || Colors.accent }]} />
+                    <AppText variant="mono" size={10} color={PIN_COLORS[selected.type] || Colors.accent} style={{ fontWeight: '700' }}>
+                      {PIN_META[selected.type]?.label.toUpperCase() || selected.type.toUpperCase()}
+                    </AppText>
+                    <AppText variant="mono" size={10} color={Colors.muted} style={{ marginLeft: 6 }}>
+                      · {selected.lat.toFixed(1)}°, {selected.lng.toFixed(1)}°
+                    </AppText>
+                  </View>
 
-            {/* Add Place FAB */}
-            <Pressable
-              style={styles.floatingAddFab}
-              onPress={() => setSheet("new")}
-            >
-              <Ionicons name="add" size={18} color="#FFFFFF" />
-              <AppText variant="smallCaps" size={11} style={{ color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }}>
-                Add Place
-              </AppText>
-            </Pressable>
-          </View>
+                  <Pressable
+                    style={styles.peekCloseBtn}
+                    onPress={() => setSelected(null)}
+                    hitSlop={10}
+                  >
+                    <Ionicons name="close" size={16} color={Colors.muted} />
+                  </Pressable>
+                </View>
+
+                {/* Body Row */}
+                <View style={styles.peekBodyRow}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <AppText variant="serif" size={19} color={Colors.ink} numberOfLines={1}>
+                      {selected.city}
+                    </AppText>
+                    <AppText variant="serifItalic" size={13} color={Colors.muted} numberOfLines={1}>
+                      {selected.country}{selected.dates ? ` · ${selected.dates}` : ''}
+                    </AppText>
+                    {selected.note ? (
+                      <AppText variant="body" size={12} color={Colors.ink2} numberOfLines={1} style={{ marginTop: 2 }}>
+                        "{selected.note}"
+                      </AppText>
+                    ) : null}
+                  </View>
+
+                  {selected.moments && selected.moments.length > 0 && selected.moments[0].photo_url ? (
+                    <Image
+                      source={{ uri: selected.moments[0].photo_url }}
+                      style={styles.peekThumbnail}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                </View>
+
+                {/* Action Footer */}
+                <View style={styles.peekFooterRow}>
+                  <AppText variant="mono" size={10} color={Colors.muted}>
+                    {selected.moments?.length || 0} {(selected.moments?.length === 1) ? 'memory' : 'memories'}
+                  </AppText>
+
+                  <View style={styles.peekActionBtn}>
+                    <AppText variant="smallCaps" size={11} color={Colors.accent} style={{ fontWeight: '700' }}>
+                      View Place Details
+                    </AppText>
+                    <Ionicons name="chevron-forward" size={13} color={Colors.accent} style={{ marginLeft: 2 }} />
+                  </View>
+                </View>
+              </Pressable>
+            </View>
+          ) : (
+            /* FLOATING BOTTOM CONTROLS */
+            <View style={styles.floatingBottomControls} pointerEvents="box-none">
+              {/* Places List Toggle Button */}
+              <Pressable
+                style={styles.floatingPlacesListBtn}
+                onPress={() => setSheet("placesList")}
+              >
+                <Ionicons name="list" size={16} color={Colors.ink} />
+                <AppText variant="smallCaps" size={11} color={Colors.ink} style={{ fontWeight: '600', marginLeft: 4 }}>
+                  Places ({filtered.length})
+                </AppText>
+              </Pressable>
+
+              {/* Add Place FAB */}
+              <Pressable
+                style={styles.floatingAddFab}
+                onPress={() => setSheet("new")}
+              >
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+                <AppText variant="smallCaps" size={11} style={{ color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }}>
+                  Add Place
+                </AppText>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 
@@ -1190,7 +1257,7 @@ export const MapScreen: React.FC = () => {
                 pin={p}
                 onPress={() => {
                   setSelected(p);
-                  setSheet("detail");
+                  setSheet(null);
                 }}
               />
             ))
@@ -1201,7 +1268,10 @@ export const MapScreen: React.FC = () => {
       {/* Detail BottomSheet */}
       <BottomSheet
         open={sheet === "detail" && !!selected}
-        onClose={() => setSheet(null)}
+        onClose={() => {
+          setSheet(null);
+          setConfirmDeletePlace(false);
+        }}
         kicker={selected ? PIN_META[selected.type].label.toUpperCase() : ""}
         title={selected?.city ?? ""}
       >
@@ -1419,15 +1489,77 @@ export const MapScreen: React.FC = () => {
                   </View>
                 </View>
               ) : (
-                <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <View style={{ marginTop: 24, alignItems: 'center', width: '100%' }}>
                   <AppText variant="smallCaps" color={Colors.muted} style={{ marginBottom: 8 }}>
                     REMOVAL PENDING
                   </AppText>
-                  <AppText variant="serifItalic" color={Colors.muted} style={{ textAlign: 'center' }}>
+                  <AppText variant="serifItalic" color={Colors.muted} style={{ textAlign: 'center', marginBottom: 14 }}>
                     Waiting for your partner to approve the removal of this place.
                   </AppText>
+                  <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+                    <AppButton
+                      full
+                      variant="outline"
+                      size="md"
+                      disabled={isDeleting}
+                      onPress={() => handleCancelDeleteRequest(selected.id.toString())}
+                    >
+                      {isDeleting ? "Cancelling..." : "Cancel Removal Request"}
+                    </AppButton>
+                  </View>
                 </View>
               )
+            ) : confirmDeletePlace ? (
+              <View style={{
+                marginTop: 20,
+                padding: 16,
+                borderRadius: 14,
+                backgroundColor: 'rgba(217, 83, 79, 0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(217, 83, 79, 0.3)',
+                gap: 12
+              }}>
+                <AppText variant="heading" size={16} color={Colors.ink}>
+                  {selected.moments && selected.moments.some((m: any) => m.creator_id && currentUserId && m.creator_id !== currentUserId)
+                    ? "Partner Approval Required"
+                    : "Remove This Place?"}
+                </AppText>
+                <AppText variant="serifItalic" size={13} color={Colors.ink2}>
+                  {selected.moments && selected.moments.some((m: any) => m.creator_id && currentUserId && m.creator_id !== currentUserId)
+                    ? "Your partner has contributed memories to this place. Removing it requires sending an approval request to them."
+                    : `Are you sure you want to remove ${selected.city} from your map? This action cannot be undone.`}
+                </AppText>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <AppButton
+                    variant="outline"
+                    size="md"
+                    style={{ flex: 1 }}
+                    onPress={() => setConfirmDeletePlace(false)}
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </AppButton>
+                  <AppButton
+                    variant="solid"
+                    size="md"
+                    style={{ flex: 1, backgroundColor: '#D9534F' }}
+                    textStyle={{ color: '#FFF' }}
+                    disabled={isDeleting}
+                    onPress={() => {
+                      const hasPartnerMoments = selected.moments && selected.moments.some(
+                        (m: any) => m.creator_id && currentUserId && m.creator_id !== currentUserId
+                      );
+                      if (hasPartnerMoments) {
+                        handleExecuteRequestDelete(selected.id.toString());
+                      } else {
+                        handleExecuteDeletePlace(selected.id.toString());
+                      }
+                    }}
+                  >
+                    {isDeleting ? "Processing..." : (selected.moments && selected.moments.some((m: any) => m.creator_id && currentUserId && m.creator_id !== currentUserId)) ? "Send Request" : "Confirm Delete"}
+                  </AppButton>
+                </View>
+              </View>
             ) : (
               <View style={{ gap: 8, marginTop: 14 }}>
                 <AppButton
@@ -1445,9 +1577,9 @@ export const MapScreen: React.FC = () => {
                   style={{ borderColor: '#D9534F' }}
                   textStyle={{ color: '#D9534F' }}
                   disabled={isDeleting}
-                  onPress={() => handleDeletePlace(selected.id.toString())}
+                  onPress={() => setConfirmDeletePlace(true)}
                 >
-                  {isDeleting ? "Removing..." : "Remove Place"}
+                  Remove Place
                 </AppButton>
               </View>
             )}
@@ -1555,17 +1687,17 @@ export const MapScreen: React.FC = () => {
                 <Ionicons name="calendar-outline" size={24} color="#000" />
               </Pressable>
 
-              {showEditDatePicker && (
-                <DateTimePicker
-                  value={editDateObj}
-                  mode="date"
-                  display="default"
-                  onChange={(event: any, selectedDate?: Date) => {
-                    setShowEditDatePicker(Platform.OS === 'ios');
-                    if (selectedDate) setEditDateObj(selectedDate);
-                  }}
-                />
-              )}
+              <AppDateTimePickerModal
+                visible={showEditDatePicker}
+                mode="date"
+                value={editDateObj}
+                title="Select Visit Date"
+                onConfirm={(date) => {
+                  setEditDateObj(date);
+                  setShowEditDatePicker(false);
+                }}
+                onCancel={() => setShowEditDatePicker(false)}
+              />
             </View>
           )}
 
@@ -1720,19 +1852,17 @@ export const MapScreen: React.FC = () => {
                 <Ionicons name="calendar-outline" size={24} color="#000" />
               </Pressable>
 
-              {showDatePicker && (
-                <DateTimePicker
-                  value={visitDateObj}
-                  mode="date"
-                  display="default"
-                  onChange={(event: any, selectedDate?: Date) => {
-                    setShowDatePicker(Platform.OS === 'ios');
-                    if (selectedDate) {
-                      setVisitDateObj(selectedDate);
-                    }
-                  }}
-                />
-              )}
+              <AppDateTimePickerModal
+                visible={showDatePicker}
+                mode="date"
+                value={visitDateObj}
+                title="Select Visit Date"
+                onConfirm={(date) => {
+                  setVisitDateObj(date);
+                  setShowDatePicker(false);
+                }}
+                onCancel={() => setShowDatePicker(false)}
+              />
             </View>
           )}
 
@@ -2160,6 +2290,70 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: 'rgba(192, 86, 64, 0.25)',
+  },
+  peekCardWrapper: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 16,
+    zIndex: 25,
+  },
+  peekCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E8E1D5',
+    shadowColor: Colors.ink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  peekHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  peekTagGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  peekDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginRight: 6,
+  },
+  peekCloseBtn: {
+    padding: 4,
+  },
+  peekBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  peekThumbnail: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: Colors.bone,
+    borderWidth: 1,
+    borderColor: '#E8E1D5',
+  },
+  peekFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0EBE1',
+  },
+  peekActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
 

@@ -41,14 +41,15 @@ const VoicePlayer: React.FC<{ url: string }> = ({ url }) => {
   const status = useAudioPlayerStatus(player);
   const isPlaying = player.playing;
 
-  const durationMs = status.duration || 0;
-  const positionMs = status.currentTime || 0;
-  const durSecs = Math.floor(durationMs / 1000);
-  const posSecs = Math.floor(positionMs / 1000);
+  const rawDuration = status.duration || 0;
+  const rawPosition = status.currentTime || 0;
+  // Handle both seconds (standard expo-audio format) and legacy milliseconds gracefully
+  const durSecs = Math.floor(rawDuration > 1000 ? rawDuration / 1000 : rawDuration);
+  const posSecs = Math.floor(rawPosition > 1000 ? rawPosition / 1000 : rawPosition);
 
   const duration = `${Math.floor(durSecs/60).toString().padStart(2,'0')}:${(durSecs%60).toString().padStart(2,'0')}`;
   const position = `${Math.floor(posSecs/60).toString().padStart(2,'0')}:${(posSecs%60).toString().padStart(2,'0')}`;
-  const progress = durationMs ? (positionMs / durationMs) : 0;
+  const progress = rawDuration ? (rawPosition / rawDuration) : 0;
 
   const togglePlayback = () => {
     try {
@@ -73,8 +74,8 @@ const VoicePlayer: React.FC<{ url: string }> = ({ url }) => {
       if (percentage < 0) percentage = 0;
       if (percentage > 1) percentage = 1;
 
-      if (durationMs) {
-        player.seekTo(percentage * durationMs);
+      if (rawDuration) {
+        player.seekTo(percentage * rawDuration);
       }
     } catch (err) {
       console.log('Error seeking', err);

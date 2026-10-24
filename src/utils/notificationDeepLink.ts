@@ -48,7 +48,10 @@ export const handleNotificationDeepLink = (
     type === 'Proposal' ||
     type === 'Date Added' ||
     type === 'Date Completion Request' ||
-    screen === 'Dates'
+    screen === 'Dates' ||
+    metadata.date_id ||
+    metadata.action === 'ping_late' ||
+    metadata.action === 'upcoming_reminder'
   ) {
     navigation.navigate('AlignedApp', {
       screen: 'Dates',

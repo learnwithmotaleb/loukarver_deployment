@@ -36,6 +36,19 @@ if (ONE_SIGNAL_APP_ID && Platform.OS !== 'web' && !isExpoGo) {
   }
 }
 
+// iOS Audio Session: Ensure audio plays even if the hardware silent switch is ON
+if (Platform.OS !== 'web') {
+  try {
+    const { setAudioModeAsync } = require('expo-audio');
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: true,
+    }).catch((e: any) => console.log("AudioMode init error:", e));
+  } catch (e) {
+    console.log("AudioMode setup skipped:", e);
+  }
+}
+
 // Fix #7: Alert.alert override is NOT done here at module level anymore.
 // It's now done inside the App component after <CustomAlert /> is guaranteed to be mounted.
 // This prevents the timing issue where Alert.alert fires before the listener exists.

@@ -185,10 +185,15 @@ const SamVibeNav: React.FC<SamVibeNavProps> = ({ onPartnerChange }) => {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const datesRes = await (listVibeDates as any)(undefined, 1, 100, tz).catch(() => null);
       if (datesRes?.data) {
-          const upcoming = datesRes.data.filter((d: any) => d.status === "accepted" && new Date(`${d.date}T${d.time}`) >= new Date());
+          const parseSafeDateTime = (dStr: string, tStr: string) => {
+            if (!dStr || !tStr) return new Date(0);
+            const cleanTime = tStr.trim().length === 5 ? `${tStr.trim()}:00` : tStr.trim();
+            return new Date(`${dStr.trim()}T${cleanTime}`);
+          };
+          const upcoming = datesRes.data.filter((d: any) => d.status === "accepted" && parseSafeDateTime(d.date, d.time) >= new Date());
           if (upcoming.length > 0) {
-              upcoming.sort((a: any, b: any) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
-              setUpcomingDate(new Date(`${upcoming[0].date}T${upcoming[0].time}`));
+              upcoming.sort((a: any, b: any) => parseSafeDateTime(a.date, a.time).getTime() - parseSafeDateTime(b.date, b.time).getTime());
+              setUpcomingDate(parseSafeDateTime(upcoming[0].date, upcoming[0].time));
           } else {
               setUpcomingDate(null);
           }

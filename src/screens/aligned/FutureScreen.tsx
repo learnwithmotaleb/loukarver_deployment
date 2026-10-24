@@ -11,6 +11,7 @@ import {
   DeviceEventEmitter,
   TextInput,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { AppText } from '../../components/ui/AppText';
@@ -112,6 +113,8 @@ export const FutureScreen: React.FC = () => {
   const [newMilestonePin, setNewMilestonePin] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isConfirmingDeleteMilestone, setIsConfirmingDeleteMilestone] = useState(false);
+  const [isDeletingMilestone, setIsDeletingMilestone] = useState(false);
 
   const checkAlignment = async () => {
     try {
@@ -210,6 +213,12 @@ export const FutureScreen: React.FC = () => {
   };
 
   const confirmDeleteStep = (mId: string, sId: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to delete this step?')) {
+        performDeleteStep(mId, sId);
+      }
+      return;
+    }
     Alert.alert('Delete Step', 'Are you sure you want to delete this step?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => performDeleteStep(mId, sId) },
@@ -312,26 +321,23 @@ export const FutureScreen: React.FC = () => {
   };
 
   const confirmDeleteMilestone = (mId: string) => {
-    Alert.alert(
-      'Delete Milestone',
-      'Are you sure you want to permanently delete this milestone? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => performDeleteMilestone(mId) },
-      ]
-    );
+    setIsConfirmingDeleteMilestone(true);
   };
 
   const performDeleteMilestone = async (mId: string) => {
+    setIsDeletingMilestone(true);
     try {
       const pin = verifiedPins[mId] || null;
       await deleteMilestone(mId, pin);
+      setIsConfirmingDeleteMilestone(false);
       setSheet(null);
       setSelected(null);
       fetchMilestones();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to delete milestone.');
+      Alert.alert('Error', e?.response?.data?.detail || 'Failed to delete milestone.');
+    } finally {
+      setIsDeletingMilestone(false);
     }
   };
 
@@ -660,6 +666,7 @@ export const FutureScreen: React.FC = () => {
         onClose={() => {
           setSheet(null);
           setNewStep('');
+          setIsConfirmingDeleteMilestone(false);
         }}
         kicker={`CHAPTER · ${selected?.icon ?? '◈'}`}
         title={selected?.label ?? ''}
@@ -784,16 +791,56 @@ export const FutureScreen: React.FC = () => {
                 </AppButton>
               </View>
 
-              {/* Delete Milestone Button */}
-              <Pressable
-                onPress={() => confirmDeleteMilestone(selected.id)}
-                style={styles.deleteMilestoneBtn}
-              >
-                <Ionicons name="trash-outline" size={15} color="#D9534F" style={{ marginRight: 6 }} />
-                <AppText color="#D9534F" variant="smallCaps" style={{ fontSize: 12, fontWeight: '600' }}>
-                  Delete Milestone
-                </AppText>
-              </Pressable>
+              {/* Delete Milestone Section */}
+              {isConfirmingDeleteMilestone ? (
+                <View style={{
+                  marginTop: 18,
+                  padding: 14,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(217, 83, 79, 0.08)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 83, 79, 0.3)',
+                  gap: 10
+                }}>
+                  <AppText variant="heading" size={15} color={Colors.ink}>
+                    Delete this milestone?
+                  </AppText>
+                  <AppText variant="serifItalic" size={13} color={Colors.ink2}>
+                    This will permanently remove &ldquo;{selected.label}&rdquo; and all its progress for both of you.
+                  </AppText>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                    <AppButton
+                      variant="outline"
+                      size="sm"
+                      style={{ flex: 1 }}
+                      onPress={() => setIsConfirmingDeleteMilestone(false)}
+                      disabled={isDeletingMilestone}
+                    >
+                      Cancel
+                    </AppButton>
+                    <AppButton
+                      variant="solid"
+                      size="sm"
+                      style={{ flex: 1, backgroundColor: '#D9534F' }}
+                      textStyle={{ color: '#FFF' }}
+                      disabled={isDeletingMilestone}
+                      onPress={() => performDeleteMilestone(selected.id)}
+                    >
+                      {isDeletingMilestone ? "Deleting..." : "Confirm Delete"}
+                    </AppButton>
+                  </View>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => setIsConfirmingDeleteMilestone(true)}
+                  style={styles.deleteMilestoneBtn}
+                >
+                  <Ionicons name="trash-outline" size={15} color="#D9534F" style={{ marginRight: 6 }} />
+                  <AppText color="#D9534F" variant="smallCaps" style={{ fontSize: 12, fontWeight: '600' }}>
+                    Delete Milestone
+                  </AppText>
+                </Pressable>
+              )}
             </View>
           );
         })()}

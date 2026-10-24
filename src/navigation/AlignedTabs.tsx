@@ -86,15 +86,24 @@ function useGlobalWebSocket() {
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
             } else if (data.type === "NEW_NOTIFICATION") {
               const notif = data.notification || {};
+              const meta = notif.metadata || data.metadata || {};
               DeviceEventEmitter.emit('SHOW_IN_APP_NOTIFICATION', {
                 id: notif.id,
                 type: notif.type || 'Partner Update',
                 title: notif.title || 'Partner Activity',
                 message: notif.message || 'Your partner made a change',
-                metadata: notif.metadata || data.metadata || {},
+                metadata: meta,
               });
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
               DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED');
+              if (
+                meta.screen === 'Dates' ||
+                meta.date_id ||
+                (notif.type && String(notif.type).toLowerCase().includes('date')) ||
+                meta.action === 'ping_late'
+              ) {
+                DeviceEventEmitter.emit('REFRESH_DATES_DATA');
+              }
             } else if (data.type === "STATE_UPDATE" || data.type === "PULSE_UPDATED" || data.type === "CYCLE_UPDATED") {
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
             } else if (data.type === "ALIGNMENT_REQUEST_RECEIVED") {

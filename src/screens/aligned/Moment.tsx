@@ -208,7 +208,7 @@ const Moment: React.FC = () => {
   };
 
   return (
-    <View>
+    <View style={styles.sectionContainer}>
       <AppText variant="smallCaps" color={Colors.ink2} style={styles.sectionLabel}>
         IN THIS MOMENT
       </AppText>
@@ -220,24 +220,24 @@ const Moment: React.FC = () => {
           disabled={thinkingSent}
         >
           <View style={styles.dotContainer}>
-            <AppText style={{ fontSize: 16 }}>◉</AppText>
+            <AppText style={{ fontSize: 18 }}>◉</AppText>
           </View>
-          <AppText variant="heading" size={18} style={{ marginTop: 8 }}>
+          <AppText variant="heading" size={20} style={{ marginTop: 10 }}>
             Thinking of you
           </AppText>
           {!interactionStats || (interactionStats.sent_count === 0 && interactionStats.received_count === 0) ? (
-            <AppText variant="serifItalic" size={14} color={Colors.muted} style={{ marginTop: 4 }}>
+            <AppText variant="serifItalic" size={14} color={Colors.muted} style={{ marginTop: 6 }}>
               A silent ping
             </AppText>
           ) : (
-            <View style={{ marginTop: 6, alignItems: 'center' }}>
+            <View style={{ marginTop: 8, alignItems: 'center' }}>
               {interactionStats.sent_count > 0 && (
-                <AppText variant="serifItalic" size={12} color={Colors.muted}>
+                <AppText variant="serifItalic" size={13} color={Colors.muted}>
                   You sent: {interactionStats.sent_count} (last {parseUtcDate(interactionStats.sent_last_activity)?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})
                 </AppText>
               )}
               {interactionStats.received_count > 0 && (
-                <AppText variant="serifItalic" size={12} color={Colors.muted} style={{ marginTop: 2 }}>
+                <AppText variant="serifItalic" size={13} color={Colors.muted} style={{ marginTop: 2 }}>
                   Partner sent: {interactionStats.received_count} (last {parseUtcDate(interactionStats.received_last_activity)?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})
                 </AppText>
               )}
@@ -249,38 +249,6 @@ const Moment: React.FC = () => {
                 SENT ✓
               </AppText>
             </View>
-          )}
-        </Pressable>
-
-        <Pressable 
-          style={[
-            styles.card, 
-            activeSession && { backgroundColor: '#E4F1E8', borderColor: '#4CAF50', borderWidth: 1 },
-            !isAligned && { opacity: 0.75 }
-          ]} 
-          onPress={handleOpenWatch}
-        >
-          <View style={styles.dotContainer}>
-            <AppText style={{ fontSize: 16 }}>◐</AppText>
-          </View>
-          {activeSession ? (
-            <>
-              <AppText variant="heading" size={18} style={{ marginTop: 8 }}>
-                {activeSession.show_name}
-              </AppText>
-              <AppText variant="serifItalic" size={14} color={Colors.muted}>
-                {activeSession.is_playing ? "Playing now" : "Active Session"}
-              </AppText>
-            </>
-          ) : (
-            <>
-              <AppText variant="heading" size={18} style={{ marginTop: 8 }}>
-                Watch together
-              </AppText>
-              <AppText variant="serifItalic" size={14} color={Colors.muted}>
-                Sync a movie, show, or game
-              </AppText>
-            </>
           )}
         </Pressable>
       </View>
@@ -477,29 +445,41 @@ const Moment: React.FC = () => {
 export default Moment;
 
 const styles = StyleSheet.create({
+  sectionContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
   sectionLabel: {
     fontSize: 12,
     letterSpacing: 2,
-    marginBottom: 20,
+    marginBottom: 16,
     paddingHorizontal: 2,
+    textAlign: "center",
   },
   cardsContainer: {
-    flexDirection: "row",
-    gap: 16,
-    marginBottom: 24,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 20,
   },
   card: {
-    flex: 1,
+    width: "100%",
+    maxWidth: 440,
     backgroundColor: Colors.cream,
-    padding: 24,
-    borderRadius: 16,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: Colors.ink2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   dotContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: Colors.bone,
     alignItems: "center",
     justifyContent: "center",
@@ -511,16 +491,17 @@ const styles = StyleSheet.create({
   },
   sentContainer: {
     position: "absolute",
-    bottom: -10,
+    bottom: -12,
     backgroundColor: Colors.cream,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.accent,
   },
   footerText: {
     textAlign: "center",
+    marginTop: 4,
   },
   platformRow: {
     flexDirection: "row",

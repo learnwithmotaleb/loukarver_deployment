@@ -28,6 +28,11 @@ export const ModeSelector: React.FC = () => {
           const user = await getMe();
           if (user?.is_aligned || user?.partner) {
             setIsAlignedUser(true);
+            nav.reset({
+              index: 0,
+              routes: [{ name: 'AlignedApp' }],
+            });
+            return;
           }
         }
       } catch (e) {
@@ -35,7 +40,7 @@ export const ModeSelector: React.FC = () => {
       }
     };
     checkUserAlignment();
-  }, []);
+  }, [nav]);
 
   useEffect(() => {
     if (route.params?.autoSelect === 'vibe') {

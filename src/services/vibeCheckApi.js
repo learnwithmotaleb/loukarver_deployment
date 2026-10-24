@@ -109,7 +109,7 @@ export const updateVibeProfile = async (name) => {
   return response.data;
 };
 
-export const uploadProfilePicture = async (imageUri) => {
+export const uploadProfilePicture = async (imageUri, cropData = null) => {
   const formData = new FormData();
   if (imageUri.startsWith('blob:') || imageUri.startsWith('data:')) {
     const res = await fetch(imageUri);
@@ -126,6 +126,14 @@ export const uploadProfilePicture = async (imageUri) => {
       name: filename,
       type,
     });
+  }
+
+  if (cropData) {
+    if (cropData.originX !== undefined) formData.append('crop_x', String(cropData.originX));
+    if (cropData.originY !== undefined) formData.append('crop_y', String(cropData.originY));
+    if (cropData.width !== undefined) formData.append('crop_width', String(cropData.width));
+    if (cropData.height !== undefined) formData.append('crop_height', String(cropData.height));
+    if (cropData.rotate !== undefined) formData.append('rotate', String(cropData.rotate));
   }
   
   const response = await api.post('/vibecheck/profile/picture', formData);

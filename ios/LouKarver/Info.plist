@@ -54,7 +54,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Allow Samesy to access your camera to scan pairing QR codes.</string>
+	<string>Allow Samesy to access your camera to take photos and scan pairing QR codes.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Samesy uses your location to show your accurate local time and city to your partner.</string>
 	<key>NSLocationAlwaysUsageDescription</key>

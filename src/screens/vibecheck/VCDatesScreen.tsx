@@ -16,7 +16,7 @@ import { AppText } from "../../components/ui/AppText";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppTextInput } from "../../components/ui/AppTextInput";
 import { BottomSheet } from "../../components/ui/BottomSheet";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimePickerModal } from "../../components/ui/AppDateTimePickerModal";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRoute, RouteProp } from "@react-navigation/native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
@@ -211,15 +211,6 @@ export const VCDatesScreen: React.FC = () => {
     }
   };
 
-  const handleDateChange = (_: any, selected?: Date) => {
-    setShowDatePicker(false);
-    if (selected) setSelectedDate(selected);
-  };
-
-  const handleTimeChange = (_: any, selected?: Date) => {
-    setShowTimePicker(false);
-    if (selected) setSelectedTime(selected);
-  };
 
   const openNewSheet = () => {
     setEditingDate(null);
@@ -674,57 +665,37 @@ export const VCDatesScreen: React.FC = () => {
         />
 
         {/* Date Picker */}
-        <View style={{ borderBottomWidth: 1, borderBottomColor: Colors.rule }}>
+        <View
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: Colors.rule,
+            marginBottom: 20,
+            paddingTop: 10,
+          }}
+        >
           <AppText
             variant="smallCaps"
             color={Colors.ink2}
             style={{ marginBottom: 8 }}
           >
-            02 Date
+            02 DATE
           </AppText>
-          {Platform.OS === 'web' ? (
-             <input
-               type="date"
-               value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`}
-               onChange={(e) => {
-                 const val = e.target.value;
-                 if (val) {
-                   const [year, month, day] = val.split("-");
-                   setSelectedDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
-                 }
-               }}
-               style={{ 
-                  fontSize: 20, 
-                  fontFamily: 'InstrumentSerif_400Regular', 
-                  border: 'none', 
-                  backgroundColor: 'transparent', 
-                  outline: 'none',
-                  paddingBottom: 8,
-                  width: '100%',
-                  color: Colors.ink
-               }}
-             />
-          ) : (
-            <>
-              <Pressable
-                style={styles.datePickerRow}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <AppText variant="display" size={20}>
-                  {formatDisplayDate(selectedDate)}
-                </AppText>
-                <Ionicons name="calendar-outline" size={26} color="#000" />
-              </Pressable>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display="default"
-                  onChange={handleDateChange}
-                />
-              )}
-            </>
-          )}
+          <Pressable
+            style={styles.datePickerRow}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <AppText variant="display" size={20}>
+              {formatDisplayDate(selectedDate)}
+            </AppText>
+            <Ionicons name="calendar-outline" size={26} color="#000" />
+          </Pressable>
+          <AppDateTimePickerModal
+            visible={showDatePicker}
+            mode="date"
+            value={selectedDate}
+            onConfirm={(d) => setSelectedDate(d)}
+            onCancel={() => setShowDatePicker(false)}
+          />
         </View>
 
         {/* Time Picker */}
@@ -743,51 +714,22 @@ export const VCDatesScreen: React.FC = () => {
           >
             03 TIME
           </AppText>
-          {Platform.OS === 'web' ? (
-             <input
-               type="time"
-               value={selectedTime.toTimeString().slice(0, 5)}
-               onChange={(e) => {
-                 const val = e.target.value;
-                 if (val) {
-                    const [hour, minute] = val.split(":");
-                    const t = new Date();
-                    t.setHours(parseInt(hour), parseInt(minute), 0, 0);
-                    setSelectedTime(t);
-                 }
-               }}
-               style={{ 
-                  fontSize: 20, 
-                  fontFamily: 'InstrumentSerif_400Regular', 
-                  border: 'none', 
-                  backgroundColor: 'transparent', 
-                  outline: 'none',
-                  paddingBottom: 8,
-                  width: '100%',
-                  color: Colors.ink
-               }}
-             />
-          ) : (
-            <>
-              <Pressable
-                style={styles.datePickerRow}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <AppText variant="display" size={20}>
-                  {formatDisplayTime(selectedTime)}
-                </AppText>
-                <Ionicons name="time-outline" size={26} color="#000" />
-              </Pressable>
-              {showTimePicker && (
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  is24Hour={false}
-                  onChange={handleTimeChange}
-                />
-              )}
-            </>
-          )}
+          <Pressable
+            style={styles.datePickerRow}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <AppText variant="display" size={20}>
+              {formatDisplayTime(selectedTime)}
+            </AppText>
+            <Ionicons name="time-outline" size={26} color="#000" />
+          </Pressable>
+          <AppDateTimePickerModal
+            visible={showTimePicker}
+            mode="time"
+            value={selectedTime}
+            onConfirm={(t) => setSelectedTime(t)}
+            onCancel={() => setShowTimePicker(false)}
+          />
         </View>
 
         {/* How We Meet */}

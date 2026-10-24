@@ -13,7 +13,7 @@ import { BottomSheet } from "../../components/ui/BottomSheet";
 import { DateCard } from "../../components/dates/DateCard";
 import { DateEntry } from "../../types";
 import { countdownParts } from "../../utils/dateUtils";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimePickerModal } from "../../components/ui/AppDateTimePickerModal";
 import { Ionicons } from "@expo/vector-icons";
 import AlignedNav from "@/components/ui/AlignedNav";
 import { showPartnerPicture } from "@/components/ui/PartnerPictureViewer";
@@ -85,6 +85,11 @@ export const DatesScreen: React.FC = () => {
   const [exactTime, setExactTime] = useState(new Date(2026, 4, 8, 19, 0)); // 7:00 PM
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [generatorStep, setGeneratorStep] = useState<"inputs" | "preview">("inputs");
+  const [aiTitle, setAiTitle] = useState("");
+  const [aiVenue, setAiVenue] = useState("");
+  const [aiNote, setAiNote] = useState("");
+  const [isSubmittingAiProposal, setIsSubmittingAiProposal] = useState(false);
   const [pingSheet, setPingSheet] = useState(false);
   const [cancelSheet, setCancelSheet] = useState(false);
   const [selectedDelay, setSelectedDelay] = useState("10 MIN");
@@ -103,8 +108,8 @@ export const DatesScreen: React.FC = () => {
 
   const [rescheduleVenue, setRescheduleVenue] = useState("");
   const [rescheduleDate, setRescheduleDate] = useState(new Date());
-  const [showReschedulePicker, setShowReschedulePicker] = useState(false);
-  const [reschedulePickerMode, setReschedulePickerMode] = useState<"date" | "time">("date");
+  const [showRescheduleDatePicker, setShowRescheduleDatePicker] = useState(false);
+  const [showRescheduleTimePicker, setShowRescheduleTimePicker] = useState(false);
 
   const moods = ["Romantic", "Playful", "Adventurous", "Relaxed", "Intimate", "Spontaneous", "Sophisticated", "Creative"];
   const vibes = ["Outdoorsy", "Foodie", "Cultural", "Nightlife", "Cozy", "Active", "Artistic", "Chill", "Glamorous"];
@@ -129,6 +134,7 @@ export const DatesScreen: React.FC = () => {
   const [isSavingMemory, setIsSavingMemory] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isCancellingProposal, setIsCancellingProposal] = useState(false);
+  const [confirmRemoveDate, setConfirmRemoveDate] = useState(false);
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
@@ -243,26 +249,6 @@ export const DatesScreen: React.FC = () => {
     });
   };
 
-  const handleDateChange = (_: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) setExactDate(selectedDate);
-  };
-
-  const handleTimeChange = (_: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) setExactTime(selectedTime);
-  };
-
-  const handleManualDateChange = (_: any, selectedDate?: Date) => {
-    setShowManualDatePicker(false);
-    if (selectedDate) setManualDate(selectedDate);
-  };
-
-  const handleManualTimeChange = (_: any, selectedTime?: Date) => {
-    setShowManualTimePicker(false);
-    if (selectedTime) setManualTime(selectedTime);
-  };
-
   const generateDate = async () => {
     if (isGenerating) return;
     if (!user?.is_aligned && !user?.partner) {
@@ -277,23 +263,43 @@ export const DatesScreen: React.FC = () => {
       let dateNote = "";
       try {
         const suggestion = await suggestDateVenue(city, mood, vibe);
-        if (suggestion && suggestion.venue) {
-          realVenue = suggestion.location || suggestion.venue;
-          dateTitle = suggestion.title;
-          dateNote = suggestion.note;
+        if (suggestion && (suggestion.venue || suggestion.title)) {
+          realVenue = suggestion.location || suggestion.venue || "";
+          dateTitle = suggestion.title || "";
+          dateNote = suggestion.note || "";
         }
       } catch (err) {
         console.log("Failed to fetch venue suggestion, falling back to backend auto-resolver:", err);
       }
 
+      setAiTitle(dateTitle || `${mood} Date in ${city || "Town"}`);
+      setAiVenue(realVenue || (city ? `${city} Date Venue` : "Secret Rendezvous"));
+      setAiNote(dateNote || `A ${vibe.toLowerCase()} and ${mood.toLowerCase()} experience together.`);
+      setGeneratorStep("preview");
+    } catch (e: any) {
+      console.log(e);
+      Alert.alert("Error", e?.response?.data?.detail || "Could not generate date suggestion.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const confirmAndProposeAiDate = async () => {
+    if (isSubmittingAiProposal) return;
+    if (!aiVenue.trim() && !aiTitle.trim()) {
+      Alert.alert("Required", "Please provide a title or location for the date.");
+      return;
+    }
+    setIsSubmittingAiProposal(true);
+    try {
       const payload = {
-        title: dateTitle || undefined,
-        where: realVenue || `${city} Date Venue`,
-        note: dateNote || undefined,
+        title: aiTitle.trim() || undefined,
+        where: aiVenue.trim() || (city ? `${city} Date Venue` : "Date Venue"),
+        note: aiNote.trim() || undefined,
         date: exactDate.toISOString().slice(0, 10).replace(/-/g, '.'),
         time: formatTime(exactTime).replace(" ", ""),
         how_we_meet: meetType,
-        city_name: city,
+        city_name: city || undefined,
         mood: mood,
         vibe: vibe,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
@@ -301,13 +307,17 @@ export const DatesScreen: React.FC = () => {
       const res = await createDate(payload);
       if (res && res.id) {
         setGeneratorSheet(false);
+        setGeneratorStep("inputs");
+        setAiTitle("");
+        setAiVenue("");
+        setAiNote("");
         refreshAll();
       }
     } catch (e: any) {
-      console.log(e);
+      console.log("Error proposing AI date:", e);
       Alert.alert("Error", e?.response?.data?.detail || "Could not propose date.");
     } finally {
-      setIsGenerating(false);
+      setIsSubmittingAiProposal(false);
     }
   };
 
@@ -388,8 +398,36 @@ export const DatesScreen: React.FC = () => {
     }
   };
 
+  const executeCancelProposal = async () => {
+    if (!selected || isCancellingProposal) return;
+    setIsCancellingProposal(true);
+    try {
+      await cancelDate(selected.id.toString());
+      setSheet(null);
+      refreshAll();
+    } catch (e: any) {
+      console.log("Error cancelling via cancelDate, trying respondToDate fallback:", e);
+      try {
+        await respondToDate(selected.id.toString(), "reject");
+        setSheet(null);
+        refreshAll();
+      } catch (err2: any) {
+        console.error("Failed to cancel proposal:", err2);
+        Alert.alert("Error", err2?.response?.data?.detail || "Could not cancel date proposal.");
+      }
+    } finally {
+      setIsCancellingProposal(false);
+    }
+  };
+
   const handleCancelProposal = () => {
     if (!selected) return;
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm("Are you sure you want to cancel this date proposal?")) {
+        executeCancelProposal();
+      }
+      return;
+    }
     Alert.alert(
       "Cancel Date Proposal",
       "Are you sure you want to cancel this date proposal?",
@@ -398,27 +436,7 @@ export const DatesScreen: React.FC = () => {
         {
           text: "Yes, Cancel",
           style: "destructive",
-          onPress: async () => {
-            if (isCancellingProposal) return;
-            setIsCancellingProposal(true);
-            try {
-              await cancelDate(selected.id.toString());
-              setSheet(null);
-              refreshAll();
-            } catch (e: any) {
-              console.log("Error cancelling via cancelDate, trying respondToDate fallback:", e);
-              try {
-                await respondToDate(selected.id.toString(), "reject");
-                setSheet(null);
-                refreshAll();
-              } catch (err2: any) {
-                console.error("Failed to cancel proposal:", err2);
-                Alert.alert("Error", err2?.response?.data?.detail || "Could not cancel date proposal.");
-              }
-            } finally {
-              setIsCancellingProposal(false);
-            }
-          }
+          onPress: executeCancelProposal
         }
       ]
     );
@@ -688,6 +706,7 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
               setExactDate(new Date());
               setExactTime(new Date());
               setMeetType("location");
+              setGeneratorStep("inputs");
               setGeneratorSheet(true);
             }}
           >
@@ -857,7 +876,10 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
       {/* Date detail sheet */}
       <BottomSheet
         open={sheet === "view" && !!selected}
-        onClose={() => setSheet(null)}
+        onClose={() => {
+          setSheet(null);
+          setConfirmRemoveDate(false);
+        }}
         kicker={`DATE · ${selected?.status.toUpperCase() ?? ""}`}
         title={selected?.venue ?? ""}
       >
@@ -1121,37 +1143,69 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
               )}
               
               {(selected.status === "completed" || selected.status === "cancelled" || selected.status === "rejected") && (
-                <AppButton 
-                  full 
-                  variant="outline" 
-                  size="lg" 
-                  style={{ marginTop: 20 }} 
-                  loading={isRemoving}
-                  onPress={() => {
-                    Alert.alert(
-                      "Remove Date",
-                      "Are you sure you want to remove this date from your list?",
-                      [
-                        { text: "Cancel", style: "cancel" },
-                        { text: "Yes", style: "destructive", onPress: async () => {
-                            if (isRemoving) return;
-                            setIsRemoving(true);
-                            try {
-                              await deleteDate(selected.id);
-                              setSheet(null);
-                              refreshAll();
-                            } catch(e) {
-                              Alert.alert("Error", "Could not remove date.");
-                            } finally {
-                              setIsRemoving(false);
-                            }
+                confirmRemoveDate ? (
+                  <View style={{
+                    marginTop: 20,
+                    padding: 14,
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(217, 83, 79, 0.08)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(217, 83, 79, 0.3)',
+                    gap: 10
+                  }}>
+                    <AppText variant="heading" size={15} color={Colors.ink}>
+                      Remove date from list?
+                    </AppText>
+                    <AppText variant="serifItalic" size={13} color={Colors.ink2}>
+                      This date will be removed from your list.
+                    </AppText>
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                      <AppButton
+                        variant="outline"
+                        size="sm"
+                        style={{ flex: 1 }}
+                        onPress={() => setConfirmRemoveDate(false)}
+                        disabled={isRemoving}
+                      >
+                        Cancel
+                      </AppButton>
+                      <AppButton
+                        variant="solid"
+                        size="sm"
+                        style={{ flex: 1, backgroundColor: '#D9534F' }}
+                        textStyle={{ color: '#FFF' }}
+                        disabled={isRemoving}
+                        onPress={async () => {
+                          if (isRemoving) return;
+                          setIsRemoving(true);
+                          try {
+                            await deleteDate(selected.id);
+                            setConfirmRemoveDate(false);
+                            setSheet(null);
+                            refreshAll();
+                          } catch (e) {
+                            Alert.alert("Error", "Could not remove date.");
+                          } finally {
+                            setIsRemoving(false);
+                          }
                         }}
-                      ]
-                    );
-                  }}
-                >
-                  Remove from list
-                </AppButton>
+                      >
+                        {isRemoving ? "Removing..." : "Confirm Remove"}
+                      </AppButton>
+                    </View>
+                  </View>
+                ) : (
+                  <AppButton 
+                    full 
+                    variant="outline" 
+                    size="lg" 
+                    style={{ marginTop: 20, borderColor: '#D9534F' }} 
+                    textStyle={{ color: '#D9534F' }}
+                    onPress={() => setConfirmRemoveDate(true)}
+                  >
+                    Remove from list
+                  </AppButton>
+                )
               )}
             </View>
           </>
@@ -1219,101 +1273,237 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
       </BottomSheet>
 
       {/* Generator sheet */}
-      <BottomSheet open={generatorSheet} onClose={() => setGeneratorSheet(false)} kicker="DATE GENERATOR" title="Generate a Date">
-        {/* 01 CITY */}
-        <AppTextInput
-          label="CITY"
-          n="01"
-          value={city}
-          onChangeText={setCity}
-          placeholder="Los Angeles"
-        />
+      <BottomSheet
+        open={generatorSheet}
+        onClose={() => {
+          setGeneratorSheet(false);
+          setGeneratorStep("inputs");
+        }}
+        kicker={generatorStep === "preview" ? "AI DATE PROPOSAL" : "DATE GENERATOR"}
+        title={generatorStep === "preview" ? "Review & Propose" : "Generate a Date"}
+      >
+        {generatorStep === "inputs" ? (
+          <>
+            {/* 01 CITY */}
+            <AppTextInput
+              label="CITY"
+              n="01"
+              value={city}
+              onChangeText={setCity}
+              placeholder="Los Angeles"
+            />
 
-        {/* 02 MOOD */}
-        <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-          02 MOOD
-        </AppText>
-        <View style={styles.chipRow}>
-          {moods.map((m) => (
-            <Pressable
-              key={m}
-              style={[styles.chip, mood === m && styles.chipSelected]}
-              onPress={() => setMood(m)}
-            >
-              <AppText variant="smallCaps" style={{ color: mood === m ? "#fff" : Colors.muted, fontSize: 10 }}>{m}</AppText>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* 03 VIBE */}
-        <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-          03 VIBE
-        </AppText>
-        <View style={styles.chipRow}>
-          {vibes.map((v) => (
-            <Pressable
-              key={v}
-              style={[styles.chip, vibe === v && styles.chipSelected]}
-              onPress={() => setVibe(v)}
-            >
-              <AppText variant="smallCaps" style={{ color: vibe === v ? "#fff" : Colors.muted, fontSize: 10 }}>{v}</AppText>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* 04 DATE & TIME */}
-        <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-          04 DATE & TIME
-        </AppText>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pressable style={[styles.timeRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
-            <AppText variant="display" size={20}>
-              {exactDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            {/* 02 MOOD */}
+            <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+              02 MOOD
             </AppText>
-            <Ionicons name="calendar-outline" size={26} color="#000" />
-          </Pressable>
+            <View style={styles.chipRow}>
+              {moods.map((m) => (
+                <Pressable
+                  key={m}
+                  style={[styles.chip, mood === m && styles.chipSelected]}
+                  onPress={() => setMood(m)}
+                >
+                  <AppText variant="smallCaps" style={{ color: mood === m ? "#fff" : Colors.muted, fontSize: 10 }}>{m}</AppText>
+                </Pressable>
+              ))}
+            </View>
 
-          <Pressable style={styles.timeRow} onPress={() => setShowTimePicker(true)}>
-            <AppText variant="display" size={20}>
-              {formatTime(exactTime)}
+            {/* 03 VIBE */}
+            <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+              03 VIBE
             </AppText>
-            <Ionicons name="time-outline" size={26} color="#000" />
-          </Pressable>
-        </View>
-        {showDatePicker && (
-          <DateTimePicker value={exactDate} mode="date" display="default" onChange={handleDateChange} />
-        )}
-        {showTimePicker && (
-          <DateTimePicker value={exactTime} mode="time" display="default" onChange={handleTimeChange} />
-        )}
+            <View style={styles.chipRow}>
+              {vibes.map((v) => (
+                <Pressable
+                  key={v}
+                  style={[styles.chip, vibe === v && styles.chipSelected]}
+                  onPress={() => setVibe(v)}
+                >
+                  <AppText variant="smallCaps" style={{ color: vibe === v ? "#fff" : Colors.muted, fontSize: 10 }}>{v}</AppText>
+                </Pressable>
+              ))}
+            </View>
 
-        {/* 05 HOW WE MEET */}
-        <AppText variant="mono" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
-          05 HOW WE MEET
-        </AppText>
-        <View style={styles.meetOptions}>
-          {[
-            { label: "Meet at the location", value: "location" },
-            { label: "I'll pick you up", value: "pickup" },
-            { label: "Pick me up", value: "pickedup" },
-          ].map((option) => (
-            <Pressable
-              key={option.value}
-              style={[styles.meetOption, meetType === option.value && styles.meetSelected]}
-              onPress={() => setMeetType(option.value as any)}
-            >
-              <AppText style={{ color: meetType === option.value ? "#fff" : Colors.ink }}>
-                {option.label}
+            {/* 04 DATE & TIME */}
+            <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+              04 DATE & TIME
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable style={[styles.timeRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
+                <AppText variant="display" size={20}>
+                  {exactDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </AppText>
+                <Ionicons name="calendar-outline" size={26} color="#000" />
+              </Pressable>
+
+              <Pressable style={styles.timeRow} onPress={() => setShowTimePicker(true)}>
+                <AppText variant="display" size={20}>
+                  {formatTime(exactTime)}
+                </AppText>
+                <Ionicons name="time-outline" size={26} color="#000" />
+              </Pressable>
+            </View>
+
+            {/* 05 HOW WE MEET */}
+            <AppText variant="mono" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>
+              05 HOW WE MEET
+            </AppText>
+            <View style={styles.meetOptions}>
+              {[
+                { label: "Meet at the location", value: "location" },
+                { label: "I'll pick you up", value: "pickup" },
+                { label: "Pick me up", value: "pickedup" },
+              ].map((option) => (
+                <Pressable
+                  key={option.value}
+                  style={[styles.meetOption, meetType === option.value && styles.meetSelected]}
+                  onPress={() => setMeetType(option.value as any)}
+                >
+                  <AppText style={{ color: meetType === option.value ? "#fff" : Colors.ink }}>
+                    {option.label}
+                  </AppText>
+                  <View style={[styles.radio, meetType === option.value && styles.radioSelected]} />
+                </Pressable>
+              ))}
+            </View>
+
+            {/* GENERATE BUTTON */}
+            <AppButton variant="solid" full size="lg" style={styles.generateBtn} onPress={generateDate} disabled={isGenerating}>
+              {isGenerating ? "Generating..." : "♦ GENERATE DATE"}
+            </AppButton>
+          </>
+        ) : (
+          <>
+            {/* STEP 2: PREVIEW & ACCEPT SUGGESTION */}
+            <View style={styles.aiSuggestionBadge}>
+              <Ionicons name="sparkles" size={16} color={Colors.accent} />
+              <AppText variant="smallCaps" color={Colors.accent} style={{ marginLeft: 6, fontSize: 11, letterSpacing: 1 }}>
+                AI Suggested Idea ({mood} • {vibe})
               </AppText>
-              <View style={[styles.radio, meetType === option.value && styles.radioSelected]} />
-            </Pressable>
-          ))}
-        </View>
+            </View>
 
-        {/* GENERATE BUTTON */}
-        <AppButton variant="solid" full size="lg" style={styles.generateBtn} onPress={generateDate} disabled={isGenerating}>
-          {isGenerating ? "Generating..." : "♦ GENERATE DATE"}
-        </AppButton>
+            {/* Editable Title */}
+            <AppTextInput
+              label="TITLE"
+              n="01"
+              value={aiTitle}
+              onChangeText={setAiTitle}
+              placeholder="Date Title"
+            />
+
+            {/* Editable Venue / Location */}
+            <AppTextInput
+              label="WHERE / VENUE"
+              n="02"
+              value={aiVenue}
+              onChangeText={setAiVenue}
+              placeholder="Venue or location"
+            />
+
+            {/* Editable Description / Plan */}
+            <AppTextInput
+              label="NOTE / THE PLAN"
+              n="03"
+              value={aiNote}
+              onChangeText={setAiNote}
+              placeholder="What makes this special..."
+              multiline
+            />
+
+            {/* Date & Time Row */}
+            <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 14, marginBottom: 10 }}>
+              04 DATE & TIME
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable style={[styles.timeRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
+                <AppText variant="display" size={20}>
+                  {exactDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </AppText>
+                <Ionicons name="calendar-outline" size={26} color="#000" />
+              </Pressable>
+
+              <Pressable style={styles.timeRow} onPress={() => setShowTimePicker(true)}>
+                <AppText variant="display" size={20}>
+                  {formatTime(exactTime)}
+                </AppText>
+                <Ionicons name="time-outline" size={26} color="#000" />
+              </Pressable>
+            </View>
+
+            {/* Meet Options */}
+            <AppText variant="mono" color={Colors.ink2} style={{ marginTop: 18, marginBottom: 10 }}>
+              05 HOW WE MEET
+            </AppText>
+            <View style={styles.meetOptions}>
+              {[
+                { label: "Meet at the location", value: "location" },
+                { label: "I'll pick you up", value: "pickup" },
+                { label: "Pick me up", value: "pickedup" },
+              ].map((option) => (
+                <Pressable
+                  key={option.value}
+                  style={[styles.meetOption, meetType === option.value && styles.meetSelected]}
+                  onPress={() => setMeetType(option.value as any)}
+                >
+                  <AppText style={{ color: meetType === option.value ? "#fff" : Colors.ink }}>
+                    {option.label}
+                  </AppText>
+                  <View style={[styles.radio, meetType === option.value && styles.radioSelected]} />
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Primary Action: Propose to partner */}
+            <AppButton
+              variant="solid"
+              full
+              size="lg"
+              style={{ ...styles.generateBtn, marginTop: 24 }}
+              onPress={confirmAndProposeAiDate}
+              disabled={isSubmittingAiProposal || isGenerating}
+            >
+              {isSubmittingAiProposal ? "Sending Proposal..." : "Propose to Partner →"}
+            </AppButton>
+
+            {/* Secondary Actions: Regenerate & Back */}
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 14 }}>
+              <AppButton
+                variant="outline"
+                size="md"
+                style={{ flex: 1 }}
+                onPress={generateDate}
+                disabled={isGenerating || isSubmittingAiProposal}
+              >
+                {isGenerating ? "Regenerating..." : "↺ Try Another"}
+              </AppButton>
+              <AppButton
+                variant="outline"
+                size="md"
+                style={{ flex: 1 }}
+                onPress={() => setGeneratorStep("inputs")}
+                disabled={isGenerating || isSubmittingAiProposal}
+              >
+                ← Back
+              </AppButton>
+            </View>
+          </>
+        )}
+
+        <AppDateTimePickerModal
+          visible={showDatePicker}
+          mode="date"
+          value={exactDate}
+          onConfirm={(d) => setExactDate(d)}
+          onCancel={() => setShowDatePicker(false)}
+        />
+        <AppDateTimePickerModal
+          visible={showTimePicker}
+          mode="time"
+          value={exactTime}
+          onConfirm={(t) => setExactTime(t)}
+          onCancel={() => setShowTimePicker(false)}
+        />
       </BottomSheet>
 
       {/* Manual propose */}
@@ -1341,12 +1531,6 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
             <Ionicons name="time-outline" size={26} color="#000" />
           </Pressable>
         </View>
-        {showManualDatePicker && (
-          <DateTimePicker value={manualDate} mode="date" display="default" onChange={handleManualDateChange} />
-        )}
-        {showManualTimePicker && (
-          <DateTimePicker value={manualTime} mode="time" display="default" onChange={handleManualTimeChange} />
-        )}
 
         {/* 05 HOW WE MEET */}
         <AppText variant="mono" color={Colors.ink2} style={{ marginTop: 10, marginBottom: 10 }}>
@@ -1374,49 +1558,69 @@ const TimerDisplay = ({ targetDate }: { targetDate: string }) => {
         <AppButton full variant="solid" size="lg" onPress={manualPropose} disabled={isManualSubmitting}>
           {isManualSubmitting ? "Proposing..." : "Propose →"}
         </AppButton>
+
+        <AppDateTimePickerModal
+          visible={showManualDatePicker}
+          mode="date"
+          value={manualDate}
+          onConfirm={(d) => setManualDate(d)}
+          onCancel={() => setShowManualDatePicker(false)}
+        />
+        <AppDateTimePickerModal
+          visible={showManualTimePicker}
+          mode="time"
+          value={manualTime}
+          onConfirm={(t) => setManualTime(t)}
+          onCancel={() => setShowManualTimePicker(false)}
+        />
       </BottomSheet>
       
       {/* Reschedule sheet */}
       <BottomSheet open={sheet === "reschedule"} onClose={() => setSheet(null)} kicker="RESCHEDULE" title="Suggest a new plan">
         <AppTextInput label="Location" n="01" placeholder="Venue or neighborhood" value={rescheduleVenue} onChangeText={setRescheduleVenue} />
         <AppText variant="smallCaps" color={Colors.ink2} style={{ marginTop: 20, marginBottom: 10 }}>02 NEW DATE & TIME</AppText>
-        <Pressable style={styles.timeRow} onPress={() => {
-          setReschedulePickerMode("date");
-          setShowReschedulePicker(true);
-        }}>
-          <AppText variant="display" size={20}>
-            {rescheduleDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {formatTime(rescheduleDate)}
-          </AppText>
-          <Ionicons name="calendar-outline" size={26} color="#000" />
-        </Pressable>
-        {showReschedulePicker && (
-          <DateTimePicker 
-            value={rescheduleDate} 
-            mode={Platform.OS === "ios" ? "datetime" : reschedulePickerMode} 
-            onChange={(event, date) => {
-              if (Platform.OS === "android") {
-                if (event.type === "set" && date) {
-                  setRescheduleDate(date);
-                  if (reschedulePickerMode === "date") {
-                    setReschedulePickerMode("time");
-                  } else {
-                    setShowReschedulePicker(false);
-                    setReschedulePickerMode("date");
-                  }
-                } else {
-                  setShowReschedulePicker(false);
-                  setReschedulePickerMode("date");
-                }
-              } else {
-                setShowReschedulePicker(false);
-                if (date) setRescheduleDate(date);
-              }
-            }} 
-          />
-        )}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Pressable style={[styles.timeRow, { flex: 1 }]} onPress={() => setShowRescheduleDatePicker(true)}>
+            <AppText variant="display" size={20}>
+              {rescheduleDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </AppText>
+            <Ionicons name="calendar-outline" size={26} color="#000" />
+          </Pressable>
+
+          <Pressable style={styles.timeRow} onPress={() => setShowRescheduleTimePicker(true)}>
+            <AppText variant="display" size={20}>
+              {formatTime(rescheduleDate)}
+            </AppText>
+            <Ionicons name="time-outline" size={26} color="#000" />
+          </Pressable>
+        </View>
+
         <AppButton full variant="solid" size="lg" style={{ marginTop: 30 }} onPress={submitReschedule}>
           Send Proposal →
         </AppButton>
+
+        <AppDateTimePickerModal
+          visible={showRescheduleDatePicker}
+          mode="date"
+          value={rescheduleDate}
+          onConfirm={(newDate) => {
+            const updated = new Date(rescheduleDate);
+            updated.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
+            setRescheduleDate(updated);
+          }}
+          onCancel={() => setShowRescheduleDatePicker(false)}
+        />
+        <AppDateTimePickerModal
+          visible={showRescheduleTimePicker}
+          mode="time"
+          value={rescheduleDate}
+          onConfirm={(newTime) => {
+            const updated = new Date(rescheduleDate);
+            updated.setHours(newTime.getHours(), newTime.getMinutes(), 0, 0);
+            setRescheduleDate(updated);
+          }}
+          onCancel={() => setShowRescheduleTimePicker(false)}
+        />
       </BottomSheet>
       
       <BottomSheet open={pingSheet} onClose={() => setPingSheet(false)} kicker="RUNNING LATE" title="Ping Amanda">
@@ -1706,5 +1910,16 @@ const styles = StyleSheet.create({
   sheetActions: { flexDirection: "row", gap: 10 },
   starsRow: { flexDirection: "row", justifyContent: "center", gap: 10, paddingTop: 8, paddingBottom: 20, marginBottom: 20 },
   delayChip: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 8, backgroundColor: "#EAE2D4" },
-  delayChipActive: { backgroundColor: "#1C1C1E", borderColor: "#1C1C1E" }
+  delayChipActive: { backgroundColor: "#1C1C1E", borderColor: "#1C1C1E" },
+  aiSuggestionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(184, 85, 62, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(184, 85, 62, 0.25)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
 });

@@ -175,10 +175,10 @@ export const VCProfileScreen: React.FC = () => {
     }
   };
 
-  const handleCropConfirmed = async (croppedUri: string) => {
+  const handleCropConfirmed = async (croppedUri: string, cropData?: any) => {
     try {
       setUploading(true);
-      const updated = await uploadProfilePicture(croppedUri);
+      const updated = await uploadProfilePicture(croppedUri, cropData);
       setProfile(updated);
       await fetchProfile();
       CustomAlert.alert('Uploaded', 'Profile picture updated.');
@@ -1141,6 +1141,29 @@ export const VCProfileScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* ==================== DELETE PROFILE SHEET ==================== */}
+      <BottomSheet
+        open={deleteSheet}
+        onClose={() => setDeleteSheet(false)}
+        kicker="PERMANENT ACTION"
+        title="Delete VibeCheck ID"
+      >
+        <View style={{ paddingVertical: 8, gap: 16 }}>
+          <AppText variant="serifItalic" size={14} color={Colors.accent} style={{ lineHeight: 20 }}>
+            This will permanently delete your VibeCheck profile, all active connections, and date history. This action CANNOT be undone.
+          </AppText>
+          <AppButton
+            variant="solid"
+            size="lg"
+            onPress={handleDeleteProfile}
+            disabled={deleting}
+            style={{ width: '100%', backgroundColor: Colors.accent, marginTop: 8 }}
+          >
+            {deleting ? 'Deleting...' : 'Permanently Delete Profile →'}
+          </AppButton>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 };

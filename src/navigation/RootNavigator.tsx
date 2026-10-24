@@ -146,6 +146,14 @@ export default function RootNavigator() {
               });
               DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
               DeviceEventEmitter.emit('UNREAD_NOTIFICATIONS_CHANGED');
+              if (
+                data.screen === 'Dates' ||
+                data.date_id ||
+                (data.type && String(data.type).toLowerCase().includes('date')) ||
+                data.action === 'ping_late'
+              ) {
+                DeviceEventEmitter.emit('REFRESH_DATES_DATA');
+              }
             }
           } catch (err) {
             console.log('Error handling foreground notification:', err);

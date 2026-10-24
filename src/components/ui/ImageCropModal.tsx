@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Pressable,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,11 +16,19 @@ import { Colors } from '../../constants/colors';
 import { AppText } from './AppText';
 import { AppButton } from './AppButton';
 
+export interface CropData {
+  originX: number;
+  originY: number;
+  width: number;
+  height: number;
+  rotate: number;
+}
+
 interface ImageCropModalProps {
   visible: boolean;
   imageUri: string | null;
   onClose: () => void;
-  onConfirm: (croppedUri: string) => Promise<void> | void;
+  onConfirm: (croppedUri: string, cropData?: CropData) => Promise<void> | void;
 }
 
 export const ImageCropModal: React.FC<ImageCropModalProps> = ({
@@ -44,11 +53,39 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const positionRef = useRef({ x: 0, y: 0 });
   positionRef.current = position;
 
+  const initialDistanceRef = useRef<number | null>(null);
+  const initialScaleRef = useRef<number>(1);
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Effective rotated dimensions
+  const isRotated90 = rotation % 180 !== 0;
+  const naturalW = imageSize?.width || 800;
+  const naturalH = imageSize?.height || 800;
+  const rotW = isRotated90 ? naturalH : naturalW;
+  const rotH = isRotated90 ? naturalW : naturalH;
+
+  const ratio = rotW / rotH;
+  const displayWidth = ratio >= 1 ? CROP_SIZE * ratio : CROP_SIZE;
+  const displayHeight = ratio >= 1 ? CROP_SIZE : CROP_SIZE / ratio;
+
+  // Clamping helper: keeps the photo covering the circular viewfinder at all times
+  const clampX = (x: number, s: number) => {
+    const maxX = Math.max(0, (displayWidth * s - CROP_SIZE) / 2);
+    return Math.max(-maxX, Math.min(maxX, x));
+  };
+
+  const clampY = (y: number, s: number) => {
+    const maxY = Math.max(0, (displayHeight * s - CROP_SIZE) / 2);
+    return Math.max(-maxY, Math.min(maxY, y));
+  };
+
   useEffect(() => {
     if (imageUri && visible) {
       setScale(1);
+      scaleRef.current = 1;
       setRotation(0);
       setPosition({ x: 0, y: 0 });
+      positionRef.current = { x: 0, y: 0 };
       Image.getSize(
         imageUri,
         (w, h) => {
@@ -61,52 +98,205 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     }
   }, [imageUri, visible]);
 
+  const getDistance = (touches: any[]) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, gestureState) => {
-        setPosition({
-          x: positionRef.current.x + gestureState.dx * 0.4,
-          y: positionRef.current.y + gestureState.dy * 0.4,
-        });
+      onPanResponderGrant: (evt) => {
+        if (evt.nativeEvent.touches.length === 2) {
+          initialDistanceRef.current = getDistance(evt.nativeEvent.touches);
+          initialScaleRef.current = scaleRef.current;
+        } else {
+          panStartRef.current = { x: positionRef.current.x, y: positionRef.current.y };
+        }
       },
-      onPanResponderRelease: (_, gestureState) => {
-        setPosition((prev) => ({
-          x: prev.x + gestureState.dx * 0.4,
-          y: prev.y + gestureState.dy * 0.4,
-        }));
+      onPanResponderMove: (evt, gestureState) => {
+        if (evt.nativeEvent.touches.length === 2) {
+          // Pinch-to-zoom
+          if (!initialDistanceRef.current) {
+            initialDistanceRef.current = getDistance(evt.nativeEvent.touches);
+            initialScaleRef.current = scaleRef.current;
+          } else {
+            const currentDist = getDistance(evt.nativeEvent.touches);
+            if (currentDist > 0 && initialDistanceRef.current > 0) {
+              const factor = currentDist / initialDistanceRef.current;
+              const newScale = Math.max(1, Math.min(3.5, initialScaleRef.current * factor));
+              scaleRef.current = newScale;
+              setScale(newScale);
+
+              const clamped = {
+                x: clampX(positionRef.current.x, newScale),
+                y: clampY(positionRef.current.y, newScale),
+              };
+              positionRef.current = clamped;
+              setPosition(clamped);
+            }
+          }
+        } else if (evt.nativeEvent.touches.length === 1) {
+          // Single-finger drag
+          const targetX = panStartRef.current.x + gestureState.dx;
+          const targetY = panStartRef.current.y + gestureState.dy;
+          const clamped = {
+            x: clampX(targetX, scaleRef.current),
+            y: clampY(targetY, scaleRef.current),
+          };
+          positionRef.current = clamped;
+          setPosition(clamped);
+        }
+      },
+      onPanResponderRelease: () => {
+        initialDistanceRef.current = null;
+      },
+      onPanResponderTerminate: () => {
+        initialDistanceRef.current = null;
       },
     })
   ).current;
 
   const handleZoomIn = () => {
-    setScale((prev) => Math.min(prev + 0.25, 3.5));
+    setScale((prev) => {
+      const next = Math.min(prev + 0.25, 3.5);
+      scaleRef.current = next;
+      const clamped = {
+        x: clampX(positionRef.current.x, next),
+        y: clampY(positionRef.current.y, next),
+      };
+      positionRef.current = clamped;
+      setPosition(clamped);
+      return next;
+    });
   };
 
   const handleZoomOut = () => {
-    setScale((prev) => Math.max(prev - 0.25, 0.75));
+    setScale((prev) => {
+      const next = Math.max(prev - 0.25, 1);
+      scaleRef.current = next;
+      const clamped = {
+        x: clampX(positionRef.current.x, next),
+        y: clampY(positionRef.current.y, next),
+      };
+      positionRef.current = clamped;
+      setPosition(clamped);
+      return next;
+    });
   };
 
   const handleRotate = () => {
-    setRotation((prev) => (prev + 90) % 360);
+    setRotation((prev) => {
+      const next = (prev + 90) % 360;
+      setPosition({ x: 0, y: 0 });
+      positionRef.current = { x: 0, y: 0 };
+      return next;
+    });
   };
 
   const handleReset = () => {
     setScale(1);
+    scaleRef.current = 1;
     setRotation(0);
     setPosition({ x: 0, y: 0 });
+    positionRef.current = { x: 0, y: 0 };
   };
 
   const handleCropAndSave = async () => {
-    if (!imageUri) return;
+    if (!imageUri || processing) return;
 
     try {
       setProcessing(true);
-      await onConfirm(imageUri);
+
+      let natW = imageSize?.width;
+      let natH = imageSize?.height;
+
+      if (!natW || !natH) {
+        const size = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+          Image.getSize(
+            imageUri,
+            (width, height) => resolve({ width, height }),
+            reject
+          );
+        }).catch(() => ({ width: 800, height: 800 }));
+        natW = size.width;
+        natH = size.height;
+      }
+
+      const normRotation = ((rotation % 360) + 360) % 360;
+      const isRot = normRotation % 180 !== 0;
+      const activeW = isRot ? natH : natW;
+      const activeH = isRot ? natW : natH;
+
+      // Base crop dimension (minimum dimension fills the crop window at scale = 1)
+      const baseCropDim = Math.min(activeW, activeH);
+      const cropDim = baseCropDim / scale;
+      const pxPerScreen = cropDim / CROP_SIZE;
+
+      let originX = Math.round((activeW - cropDim) / 2 - position.x * pxPerScreen);
+      let originY = Math.round((activeH - cropDim) / 2 - position.y * pxPerScreen);
+      let width = Math.round(cropDim);
+      let height = Math.round(cropDim);
+
+      // Boundary safety clamping
+      originX = Math.max(0, Math.min(originX, activeW - width));
+      originY = Math.max(0, Math.min(originY, activeH - height));
+
+      const cropData: CropData = {
+        originX,
+        originY,
+        width,
+        height,
+        rotate: normRotation,
+      };
+
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        try {
+          const croppedWebUri = await new Promise<string>((resolve) => {
+            const img = new (window as any).Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                const targetSize = Math.min(width, 800);
+                canvas.width = targetSize;
+                canvas.height = targetSize;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(imageUri);
+
+                if (normRotation !== 0) {
+                  ctx.translate(targetSize / 2, targetSize / 2);
+                  ctx.rotate((normRotation * Math.PI) / 180);
+                  ctx.translate(-targetSize / 2, -targetSize / 2);
+                }
+
+                ctx.drawImage(img, originX, originY, width, height, 0, 0, targetSize, targetSize);
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
+              } catch (err) {
+                resolve(imageUri);
+              }
+            };
+            img.onerror = () => resolve(imageUri);
+            img.src = imageUri;
+          });
+          await onConfirm(croppedWebUri, cropData);
+          onClose();
+          return;
+        } catch (webErr) {
+          console.log('Web canvas fallback:', webErr);
+        }
+      }
+
+      await onConfirm(imageUri, cropData);
       onClose();
     } catch (e) {
-      console.error('Error saving image:', e);
+      console.error('Error cropping image:', e);
+      try {
+        await onConfirm(imageUri);
+      } catch (err) {}
       onClose();
     } finally {
       setProcessing(false);
@@ -154,17 +344,21 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 height: CROP_SIZE,
                 alignItems: 'center',
                 justifyContent: 'center',
-                transform: [
-                  { translateX: position.x },
-                  { translateY: position.y },
-                  { scale: scale },
-                  { rotate: `${rotation}deg` },
-                ],
+                overflow: 'hidden',
               }}
             >
               <Image
                 source={{ uri: imageUri }}
-                style={{ width: CROP_SIZE, height: CROP_SIZE }}
+                style={{
+                  width: isRotated90 ? displayHeight : displayWidth,
+                  height: isRotated90 ? displayWidth : displayHeight,
+                  transform: [
+                    { translateX: position.x },
+                    { translateY: position.y },
+                    { scale: scale },
+                    { rotate: `${rotation}deg` },
+                  ],
+                }}
                 resizeMode="cover"
               />
             </View>
@@ -233,7 +427,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             disabled={processing}
             style={{ flex: 2, backgroundColor: Colors.ink }}
           >
-            {processing ? 'Saving...' : '✓ Use This Photo'}
+            {processing ? 'Cropping...' : '✓ Use This Photo'}
           </AppButton>
         </View>
       </SafeAreaView>

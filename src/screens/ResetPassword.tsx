@@ -36,7 +36,16 @@ const ResetPassword = () => {
       const data = await resetPassword(email, otp, newPassword);
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
-      navigation.navigate('ModeSelector');
+      const { getMe } = require('../services/authApi');
+      const user = await getMe().catch(() => null);
+      if (user?.is_aligned || user?.partner) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'AlignedApp' }],
+        });
+      } else {
+        navigation.navigate('ModeSelector');
+      }
     } catch (error: any) {
       const errorMessage = error.response?.data?.detail || error.message || 'Reset failed.';
       setErrorText(errorMessage);

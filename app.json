@@ -1,89 +1,90 @@
 {
-    "expo":  {
-                 "name":  "Samesy",
-                 "slug":  "aligned-rn",
-                 "scheme":  "samesy",
-                 "version":  "1.0.1",
-                 "orientation":  "portrait",
-                 "icon":  "./assets/icon.png",
-                 "userInterfaceStyle":  "light",
-                 "splash":  {
-                                "backgroundColor":  "#F4EEE4"
-                            },
-                 "ios":  {
-                             "supportsTablet":  false,
-                             "bundleIdentifier":  "com.loukarver.app",
-                             "buildNumber":  "3",
-                             "config":  {
-                                            "usesNonExemptEncryption":  false
-                                        },
-                             "infoPlist":  {
-                                               "NSCameraUsageDescription":  "Allow Samesy to access your camera to scan pairing QR codes.",
-                                               "NSPhotoLibraryUsageDescription":  "Allow Samesy to access your photo library for profile photos and shared memories.",
-                                               "NSMicrophoneUsageDescription":  "Allow Samesy to access your microphone for voice notes.",
-                                               "NSLocationWhenInUseUsageDescription":  "Allow Samesy to access your location to show your accurate local time and city to your partner.",
-                                               "ITSAppUsesNonExemptEncryption":  false
-                                           }
-                         },
-                 "android":  {
-                                 "usesCleartextTraffic": true,
-                                 "adaptiveIcon":  {
-                                                      "backgroundColor":  "#F4EEE4"
-                                                  },
-                                 "package":  "com.loukarver.app",
-                                 "permissions":  [
-                                                     "android.permission.INTERNET",
-                                                     "android.permission.ACCESS_NETWORK_STATE",
-                                                     "android.permission.ACCESS_WIFI_STATE",
-                                                     "android.permission.ACCESS_FINE_LOCATION",
-                                                     "android.permission.ACCESS_COARSE_LOCATION",
-                                                     "android.permission.READ_EXTERNAL_STORAGE",
-                                                     "android.permission.WRITE_EXTERNAL_STORAGE",
-                                                     "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-                                                     "android.permission.READ_MEDIA_IMAGES",
-                                                     "android.permission.READ_MEDIA_VIDEO",
-                                                     "android.permission.READ_MEDIA_AUDIO",
-                                                     "android.permission.CAMERA",
-                                                     "android.permission.RECORD_AUDIO",
-                                                     "android.permission.MODIFY_AUDIO_SETTINGS"
-                                                 ]
-                             },
-                 "plugins":  [
-                                 "expo-font",
-                                 [
-                                     "expo-location",
-                                     {
-                                         "locationWhenInUsePermission":  "Samesy uses your location to show your accurate local time and city to your partner.",
-                                         "locationAlwaysAndWhenInUsePermission":  "Samesy uses your location to show your accurate local time and city to your partner.",
-                                         "locationAlwaysPermission":  "Samesy uses your location to show your accurate local time and city to your partner."
-                                     }
-                                 ],
-                                 [
-                                     "expo-media-library",
-                                     {
-                                         "photosPermission":  "Allow Samesy to save photos to your device.",
-                                         "savePhotosPermission":  "Allow Samesy to save photos to your device.",
-                                         "isAccessMediaLocationEnabled":  false
-                                     }
-                                 ],
-                                 [
-                                     "onesignal-expo-plugin",
-                                     {
-                                         "mode":  "production"
-                                     }
-                                 ],
-                                 [
-                                     "expo-audio",
-                                     {
-                                         "microphonePermission":  "Allow Samesy to access your microphone for voice notes."
-                                     }
-                                 ],
-                                 "expo-video"
-                             ],
-                 "extra":  {
-                               "eas":  {
-                                           "projectId":  "bbb297ac-7138-4d0c-a127-b62cecd20885"
-                                       }
-                           }
-             }
+  "expo": {
+    "name": "Samesy",
+    "slug": "aligned-rn",
+    "scheme": "samesy",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F4EEE4"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.loukarver.app",
+      "buildNumber": "3",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Samesy to access your camera to take photos and scan pairing QR codes.",
+        "NSPhotoLibraryUsageDescription": "Allow Samesy to access your photo library for profile photos and shared memories.",
+        "NSPhotoLibraryAddUsageDescription": "Allow Samesy to save photos and memories to your photo library.",
+        "NSMicrophoneUsageDescription": "Allow Samesy to access your microphone for voice notes.",
+        "NSLocationWhenInUseUsageDescription": "Samesy uses your location to show your accurate local time and city to your partner.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#F4EEE4"
+      },
+      "package": "com.loukarver.app",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Samesy uses your location to show your accurate local time and city to your partner.",
+          "locationAlwaysAndWhenInUsePermission": "Samesy uses your location to show your accurate local time and city to your partner.",
+          "locationAlwaysPermission": "Samesy uses your location to show your accurate local time and city to your partner."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Samesy to save photos to your device.",
+          "savePhotosPermission": "Allow Samesy to save photos to your device.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Samesy to access your microphone for voice notes."
+        }
+      ],
+      "expo-video"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bbb297ac-7138-4d0c-a127-b62cecd20885"
+      }
+    }
+  }
 }

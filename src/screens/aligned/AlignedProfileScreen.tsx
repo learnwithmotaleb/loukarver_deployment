@@ -204,10 +204,10 @@ export const AlignedProfileScreen: React.FC = () => {
     }
   };
 
-  const handleCropConfirmed = async (croppedUri: string) => {
+  const handleCropConfirmed = async (croppedUri: string, cropData?: any) => {
     try {
       setUploading(true);
-      await uploadProfilePhoto(croppedUri);
+      await uploadProfilePhoto(croppedUri, cropData);
       await fetchUserData();
       DeviceEventEmitter.emit('REFRESH_ALIGNED_DATA');
       CustomAlert.alert('Uploaded', 'Profile photo updated successfully.');
