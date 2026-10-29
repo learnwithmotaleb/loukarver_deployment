@@ -278,7 +278,8 @@ export const MapScreen: React.FC = () => {
     if (text.trim().length < 2) return;
 
     // 2. High-speed (180ms debounce) MapTiler worldwide geocoding
-    mapSearchTimerRef.current = setTimeout(async () => {
+    mapSearchTimerRef.current = setTimeout(() => {
+      (async () => {
       try {
         setIsSearchingMap(true);
         const res = await axios.get(
@@ -328,6 +329,7 @@ export const MapScreen: React.FC = () => {
       } finally {
         setIsSearchingMap(false);
       }
+      })();
     }, 180);
   };
 
@@ -413,7 +415,8 @@ export const MapScreen: React.FC = () => {
       return;
     }
 
-    searchTimerRef.current = setTimeout(async () => {
+    searchTimerRef.current = setTimeout(() => {
+      (async () => {
       try {
         setIsSearchingCity(true);
         const res = await axios.get(
@@ -443,6 +446,7 @@ export const MapScreen: React.FC = () => {
       } finally {
         setIsSearchingCity(false);
       }
+      })();
     }, 250);
   };
 
