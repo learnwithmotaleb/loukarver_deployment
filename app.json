@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "learnwithmotaleb",
     "name": "Samesy",
     "slug": "aligned-rn",
     "scheme": "samesy",
@@ -87,7 +88,24 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "bbb297ac-7138-4d0c-a127-b62cecd20885"
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.loukarver.app.OneSignalNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.loukarver.app.onesignal"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "5cc6de43-554a-4b95-bf1d-fdec2274812d"
       }
     }
   }
