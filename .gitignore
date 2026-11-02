@@ -10,8 +10,6 @@ build/
 web-build/
 
 # ── Environment & Secrets ──────────────────────────────────
-.env
-.env.*
 !.env.example
 *.env
 *.local
@@ -49,7 +47,7 @@ config.bat
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
 *.swp
 *~
 branch_structure.json
+.gitignore
